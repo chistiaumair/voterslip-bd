@@ -644,7 +644,9 @@
         slicedCards.push({
           name: cardFilename,
           pageNum: pageNum,
-          cardIndex: cardIndex
+          cardIndex: cardIndex,
+          dataUrl: trimmed.dataUrl,
+          subFolderName: subFolderName
         });
 
         totalCardsExtracted++;
@@ -1309,7 +1311,41 @@
 
           if (cards && cards.length > 0) {
             totalAllCards += cards.length;
+            allJobs.push(...cards);
             window.slicer.triggerLog(`✅ [${fileIdx + 1}/${totalPdfs}] ${f.name} থেকে ${cards.length} টি কার্ড সম্পন্ন হয়েছে।\n`);
+          }
+        }
+
+        // If not using a native directory handle and running in browser (Firebase Hosting / Static Web), auto-package into ZIP!
+        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (!outputDirHandle && !isLocalHost && allJobs.length > 0) {
+          try {
+            window.slicer.triggerLog(`\n📦 মোট ${allJobs.length} টি ভোটার কার্ড জিপ ফাইলে প্যাকেজ করা হচ্ছে...\n`);
+            const zipFiles = allJobs.filter(c => c.dataUrl).map(c => {
+              const commaIdx = c.dataUrl.indexOf(',');
+              const bStr = atob(c.dataUrl.substring(commaIdx + 1));
+              const u8 = new Uint8Array(bStr.length);
+              for (let i = 0; i < bStr.length; i++) u8[i] = bStr.charCodeAt(i);
+              return {
+                name: c.subFolderName ? `${c.subFolderName}/${c.name}` : c.name,
+                data: u8
+              };
+            });
+            if (zipFiles.length > 0) {
+              const zipBlob = createZipBlob(zipFiles);
+              const zipUrl = URL.createObjectURL(zipBlob);
+              const a = document.createElement('a');
+              a.href = zipUrl;
+              const safeName = (outputDirPath || 'VoterCards').replace(/[^a-zA-Z0-9_\u0980-\u09FF-]/g, '_');
+              a.download = `${safeName}_${Date.now()}.zip`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              setTimeout(() => URL.revokeObjectURL(zipUrl), 60000);
+              window.slicer.triggerLog(`💾 জিপ ফাইল "${a.download}" স্বয়ংক্রিয়ভাবে ডাউনলোড সম্পন্ন হয়েছে!\n`);
+            }
+          } catch (zipErr) {
+            console.error("ZIP creation error:", zipErr);
           }
         }
 
@@ -1322,13 +1358,13 @@
           boxes_detected: totalAllCards
         });
 
-        window.slicer.triggerLog(`\n🎉 সম্পূর্ণ ব্যাচ সম্পন্ন! মোট ${totalPdfs} টি ফাইল থেকে ${totalAllCards} টি ভোটার কার্ড সরাসরি ফোল্ডারে সেভ হয়েছে।\n`);
+        window.slicer.triggerLog(`\n🎉 সম্পূর্ণ ব্যাচ সম্পন্ন! মোট ${totalPdfs} টি ফাইল থেকে ${totalAllCards} টি ভোটার কার্ড প্রসেস হয়েছে।\n`);
 
         window.slicer.triggerFinished({
           code: 0,
           totalCards: totalAllCards,
           outputDir: outputDirPath,
-          outputDirName: outputDirHandle ? outputDirHandle.name : (outputDirPath ? outputDirPath.split(/[\\/]/).pop() : null)
+          outputDirName: outputDirHandle ? outputDirHandle.name : (outputDirPath ? outputDirPath.split(/[\\/]/).pop() : 'VoterCards')
         });
       },
       onProgress: (cb) => slicerListeners.progress.push(cb),

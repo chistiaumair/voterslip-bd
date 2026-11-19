@@ -8882,7 +8882,7 @@
       function getSlicerOptions(previewOnly = false) {
         return {
           inputDir: slicerInputDirInput.value,
-          outputDir: slicerOutputDirInput.value,
+          outputDir: slicerOutputDirInput ? slicerOutputDirInput.value.replace(/^[📁📦]\s*/, '').replace(/\s*\(.*\)$/, '').trim() : "VoterCards",
           cleanup: true,
           hideBorders: slicerHideBordersCheckbox ? slicerHideBordersCheckbox.checked : false,
           previewOnly: previewOnly,
@@ -9067,22 +9067,32 @@
         }
         modal.style.display = "flex";
 
+        let quickFoldersLoaded = false;
         try {
           const res = await fetch('/api/quick-folders');
-          const data = await res.json();
-          if (data.success) {
-            if (!initialPath || !initialPath.includes(':')) {
-              if (target === 'output' || target === 'slicer_output') {
-                initialPath = data.voterCards || data.desktop;
-              } else {
-                initialPath = data.desktop;
+          if (res && res.ok) {
+            const data = await res.json();
+            if (data.success) {
+              quickFoldersLoaded = true;
+              if (!initialPath || !initialPath.includes(':')) {
+                if (target === 'output' || target === 'slicer_output') {
+                  initialPath = data.voterCards || data.desktop;
+                } else {
+                  initialPath = data.desktop;
+                }
               }
+              renderQuickButtons(data);
+              renderDriveButtons(data.drives || ['C:\\']);
             }
-            renderQuickButtons(data);
-            renderDriveButtons(data.drives || ['C:\\']);
           }
         } catch (e) {
           console.warn("Could not load quick folders:", e);
+        }
+
+        if (!quickFoldersLoaded) {
+          // Web Mode: Render clean web folder picker & ZIP mode interface
+          renderWebFolderModalUI(target);
+          return;
         }
 
         if (!initialPath || !initialPath.includes(':')) {
@@ -9098,6 +9108,106 @@
         await browseDirInModal(currentModalBrowseDir);
       }
       window.openFolderSelectorModal = openFolderSelectorModal;
+
+      function renderWebFolderModalUI(target) {
+        const quickContainer = document.getElementById("slicerQuickButtons");
+        const driveContainer = document.getElementById("slicerDriveButtons");
+        const listEl = document.getElementById("slicerSubfoldersList");
+        const chosenInput = document.getElementById("slicerModalChosenPathInput");
+        const currentPathEl = document.getElementById("slicerModalCurrentPath");
+
+        if (currentPathEl) currentPathEl.textContent = "ওয়েব ব্রাউজার মোড (Web Mode)";
+        const defaultName = localStorage.getItem("slicerOutputDir") || "VoterCards";
+        if (chosenInput) chosenInput.value = defaultName;
+
+        if (driveContainer) driveContainer.innerHTML = '';
+        if (quickContainer) {
+          quickContainer.innerHTML = '';
+          const options = [
+            { label: '📂 ফোল্ডার নির্বাচন', color: '#10b981', action: async () => {
+              if ('showDirectoryPicker' in window) {
+                try {
+                  const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                  if (dirHandle) {
+                    window.__slicerOutputDirHandle = dirHandle;
+                    if (slicerOutputDirInput) slicerOutputDirInput.value = `📁 ${dirHandle.name}`;
+                    localStorage.setItem("slicerOutputDir", dirHandle.name);
+                    closeSlicerModal();
+                    return;
+                  }
+                } catch (e) {}
+              }
+            }},
+            { label: '📦 ZIP ডাউনলোড মোড', color: '#0284c7', action: () => {
+              window.__slicerOutputDirHandle = null;
+              if (slicerOutputDirInput) slicerOutputDirInput.value = "📦 VoterCards (স্বয়ংক্রিয় ZIP ডাউনলোড)";
+              localStorage.setItem("slicerOutputDir", "VoterCards");
+              closeSlicerModal();
+            }},
+            { label: '📁 VoterCards ফোল্ডার', color: '#6366f1', action: () => {
+              if (chosenInput) chosenInput.value = "VoterCards";
+            }}
+          ];
+          options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = opt.label;
+            btn.style.cssText = `background: ${opt.color}; color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;`;
+            btn.onclick = opt.action;
+            quickContainer.appendChild(btn);
+          });
+        }
+
+        if (listEl) {
+          listEl.innerHTML = `
+            <div style="padding: 16px; text-align: center; color: #f1f5f9; background: #0f172a; border-radius: 8px;">
+              <div style="font-size: 26px; margin-bottom: 6px;">📁</div>
+              <div style="font-size: 13px; font-weight: bold; color: #38bdf8; margin-bottom: 6px;">আউটপুট ফোল্ডার নির্বাচন (Web Mode)</div>
+              <div style="font-size: 11px; color: #94a3b8; margin-bottom: 14px; line-height: 1.4;">
+                সরাসরি আপনার কম্পিউটারের যেকোনো ফোল্ডারে ছবিগুলো সেভ করতে নিচের বাটনে চাপুন অথবা ZIP ফাইল হিসেবে ডাউনলোড করুন।
+              </div>
+              <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                <button type="button" id="modalWebPickFolderBtn" style="background: #10b981; color: white; border: none; border-radius: 6px; padding: 9px 18px; font-size: 11.5px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);">
+                  📂 কম্পিউটারের ফোল্ডার সিলেক্ট করুন
+                </button>
+                <button type="button" id="modalWebZipBtn" style="background: #0284c7; color: white; border: none; border-radius: 6px; padding: 9px 18px; font-size: 11.5px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(2, 132, 199, 0.3);">
+                  📦 জিপ ফাইল ডাউনলোড মোড
+                </button>
+              </div>
+            </div>
+          `;
+
+          const pBtn = document.getElementById("modalWebPickFolderBtn");
+          if (pBtn) {
+            pBtn.onclick = async () => {
+              if ('showDirectoryPicker' in window) {
+                try {
+                  const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                  if (dirHandle) {
+                    window.__slicerOutputDirHandle = dirHandle;
+                    if (slicerOutputDirInput) slicerOutputDirInput.value = `📁 ${dirHandle.name}`;
+                    localStorage.setItem("slicerOutputDir", dirHandle.name);
+                    closeSlicerModal();
+                    return;
+                  }
+                } catch (e) {}
+              } else {
+                alert("আপনার ব্রাউজারে ডিরেক্টরি পিকার সমর্থিত নয়। জিপ ডাউনলোড মোড ব্যবহার করুন।");
+              }
+            };
+          }
+
+          const zBtn = document.getElementById("modalWebZipBtn");
+          if (zBtn) {
+            zBtn.onclick = () => {
+              window.__slicerOutputDirHandle = null;
+              if (slicerOutputDirInput) slicerOutputDirInput.value = "📦 VoterCards (স্বয়ংক্রিয় ZIP ডাউনলোড)";
+              localStorage.setItem("slicerOutputDir", "VoterCards");
+              closeSlicerModal();
+            };
+          }
+        }
+      }
 
       function renderQuickButtons(data) {
         const container = document.getElementById("slicerQuickButtons");
@@ -9319,7 +9429,7 @@
 
       // Select Output Folder Button Handler
       if (selectSlicerOutputDirBtn) {
-        selectSlicerOutputDirBtn.addEventListener("click", () => {
+        selectSlicerOutputDirBtn.addEventListener("click", async () => {
           if (window.slicer && window.slicer.selectDirectory && !window.slicer.isWebEngine) {
             // Electron Desktop App Mode: native IPC directory selection (100% untouched)
             window.slicer.selectDirectory("Select Sliced Images Output Folder").then(dir => {
@@ -9328,10 +9438,40 @@
                 localStorage.setItem("slicerOutputDir", dir);
               }
             });
-          } else {
-            // Web Browser Mode: Open Built-in Folder Selector Modal
-            openFolderSelectorModal('output');
+            return;
           }
+
+          // If on localhost with web_server.js:
+          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          if (isLocal) {
+            try {
+              const res = await fetch('/api/quick-folders').catch(() => null);
+              if (res && res.ok) {
+                openFolderSelectorModal('output');
+                return;
+              }
+            } catch (e) {}
+          }
+
+          // Modern Web Browser Mode (Chrome, Edge, Brave, Opera):
+          // Immediately open native OS folder picker dialog!
+          if ('showDirectoryPicker' in window) {
+            try {
+              const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+              if (dirHandle) {
+                window.__slicerOutputDirHandle = dirHandle;
+                slicerOutputDirInput.value = `📁 ${dirHandle.name}`;
+                localStorage.setItem("slicerOutputDir", dirHandle.name);
+                return;
+              }
+            } catch (err) {
+              if (err.name === 'AbortError') return; // User cancelled
+              console.warn("showDirectoryPicker failed, opening modal:", err);
+            }
+          }
+
+          // Web Browser Mode Fallback: Open Built-in Folder Selector Modal
+          openFolderSelectorModal('output');
         });
       }
 
@@ -9376,7 +9516,13 @@
         slicerInputDirInput.value = savedIn;
       }
       if (slicerOutputDirInput) {
-        slicerOutputDirInput.value = localStorage.getItem("slicerOutputDir") || "";
+        const savedOut = localStorage.getItem("slicerOutputDir");
+        if (savedOut && savedOut.trim()) {
+          slicerOutputDirInput.value = (savedOut.startsWith("📁") || savedOut.startsWith("📦")) ? savedOut : `📁 ${savedOut}`;
+        } else {
+          slicerOutputDirInput.value = "📁 VoterCards";
+          localStorage.setItem("slicerOutputDir", "VoterCards");
+        }
       }
 
       // Restore sizer configuration values
@@ -9547,11 +9693,12 @@
             else alert("অনুগ্রহ করে ইনপুট ফোল্ডার সিলেক্ট করুন।");
             return;
           }
-          const currentOutDir = (options.outputDir || (slicerOutputDirInput ? slicerOutputDirInput.value.trim() : ""));
+          let currentOutDir = (options.outputDir || (slicerOutputDirInput ? slicerOutputDirInput.value.trim() : ""));
           if (!currentOutDir && !window.__slicerOutputDirHandle) {
-            if (selectSlicerOutputDirBtn) selectSlicerOutputDirBtn.click();
-            else alert("অনুগ্রহ করে একটি আউটপুট ফোল্ডার সিলেক্ট করুন যাতে ছবিগুলো সেভ করা যায়।");
-            return;
+            currentOutDir = "VoterCards";
+            if (slicerOutputDirInput) slicerOutputDirInput.value = "📁 VoterCards";
+            localStorage.setItem("slicerOutputDir", "VoterCards");
+            options.outputDir = "VoterCards";
           }
 
           const openOutBtn = document.getElementById("openSlicerOutputDirBtn");

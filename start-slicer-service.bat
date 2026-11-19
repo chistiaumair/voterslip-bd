@@ -11,3 +11,4 @@ echo [2/2] Starting Flask Microservice on http://localhost:5000...
 echo.
 python slicer-service/app.py
 pause
+
