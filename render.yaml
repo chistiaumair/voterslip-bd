@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: voterslip-cloud-slicer
+    runtime: docker
+    dockerfilePath: ./slicer-service/Dockerfile
+    dockerContext: .
+    plan: free
+    region: singapore
+    envVars:
+      - key: PORT
+        value: 5000

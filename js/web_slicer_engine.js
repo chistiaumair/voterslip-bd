@@ -167,7 +167,7 @@
   const sharedTrimCanvas = document.createElement('canvas');
   const sharedTrimCtx = sharedTrimCanvas.getContext('2d');
 
-  function autoTrimRightWhitespaceFromPageData(pageImgData, srcCanvas, startX, startY, width, height, padRight = 20, is2LineMode = true) {
+  function autoTrimRightWhitespaceFromPageData(pageImgData, srcCanvas, startX, startY, width, height, padRight = 22, is2LineMode = true) {
     startX = Math.max(0, Math.floor(startX));
     startY = Math.max(0, Math.floor(startY));
     const pW = pageImgData.width;
@@ -179,18 +179,18 @@
 
     const data = pageImgData.data;
 
-    // Detect any horizontal border lines across all rows (>30% dark pixels)
-    const isBorderRow = new Array(height).fill(false);
-    for (let r = 0; r < height; r++) {
+    // Ignore residual horizontal line on top 1-5 rows ONLY (100% exact match with python pdf_slice.py line 278)
+    const isTopBorderRow = new Array(Math.min(5, height)).fill(false);
+    for (let r = 0; r < Math.min(5, height); r++) {
       let rDark = 0;
       const rowOffset = (startY + r) * pW * 4;
       for (let c = 0; c < width; c++) {
         const idx = rowOffset + (startX + c) * 4;
         const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-        if (lum < 185) rDark++;
+        if (lum < 180) rDark++;
       }
-      if (rDark > width * 0.30) {
-        isBorderRow[r] = true;
+      if (rDark > width * 0.35) {
+        isTopBorderRow[r] = true;
       }
     }
 
@@ -201,10 +201,10 @@
       let darkCount = 0;
       const colX = startX + col;
       for (let row = 0; row < height; row++) {
-        if (isBorderRow[row]) continue; // Ignore horizontal border line row
+        if (row < 5 && isTopBorderRow[row]) continue; // Ignore residual top border line ONLY
         const idx = ((startY + row) * pW + colX) * 4;
         const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-        if (lum < 185) {
+        if (lum < 180) {
           darkCount++;
         }
       }
@@ -219,11 +219,14 @@
       return null;
     }
 
-    // Ensure comfortable width (at least 250px) so cards never look cramped or thin
-    const minWidth = Math.min(width, Math.round(250 * (srcCanvas.width / 1755)));
+    // Exact match with python pdf_slice.py line 285-286:
+    // min_w = int(250 * (resolutionScale / 2.0))
+    // target_w = max(min_w, min(cropped_hide.shape[1], max_col + 22))
+    const resolutionScale = (srcCanvas.width / 842.0) || 2.0;
+    const minWidth = Math.round(250 * (resolutionScale / 2.0));
     const trimmedWidth = Math.max(minWidth, Math.min(width, maxCol + padRight));
 
-    // Smart Bottom Trim: Prune any Line 3 Father's name kar signs if present
+    // Smart Bottom Trim: Prune any Line 3 Father's name kar signs if present (matching pdf_slice.py line 290)
     let finalH = height;
     if (is2LineMode && finalH > 35) {
       const rowCounts = new Array(finalH).fill(0);
@@ -232,7 +235,7 @@
         for (let c = 0; c < trimmedWidth; c++) {
           const idx = rowOffset + (startX + c) * 4;
           const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-          if (lum < 185) rowCounts[r]++;
+          if (lum < 180) rowCounts[r]++;
         }
       }
       for (let r = finalH - 2; r >= Math.max(0, finalH - 6); r--) {
@@ -253,20 +256,20 @@
     );
 
     return {
-      dataUrl: sharedTrimCanvas.toDataURL('image/jpeg', 0.82),
+      dataUrl: sharedTrimCanvas.toDataURL('image/jpeg', 0.85),
       width: trimmedWidth,
       height: finalH
     };
   }
 
-  function autoTrimRightWhitespace(srcCanvas, startX, startY, width, height, padRight = 20, is2LineMode = true) {
+  function autoTrimRightWhitespace(srcCanvas, startX, startY, width, height, padRight = 22, is2LineMode = true) {
     const srcCtx = srcCanvas.getContext('2d', { willReadFrequently: true });
     const imgData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
     return autoTrimRightWhitespaceFromPageData(imgData, srcCanvas, startX, startY, width, height, padRight, is2LineMode);
   }
 
   // 5. Detect Card Boxes on a Page Canvas
-  function detectPageCardBoxes(canvas, scale = 2.083, isFirstVoterPage = false) {
+  function detectPageCardBoxes(canvas, scale = 2.0, isFirstVoterPage = false) {
     const w = canvas.width;
     const h = canvas.height;
 
@@ -275,23 +278,27 @@
     const boxes = [];
 
     // Most Bangladesh Election Commission voter sheets are Landscape (A4 Landscape, 842.4 x 597.6 pt):
-    // 3 Columns: Col 1 = 67.8pt, Col 2 = 304.4pt, Col 3 = 541.0pt (Width = 232.6pt, Gap = 4.0pt)
-    // Page 3 (First voter page): 5 rows starting at Y = 114.2pt (Row step = 81.0pt, Height = 77.0pt)
-    // Page 4+ (Subsequent pages): 6 rows starting at Y = 32.2pt (Row step = 81.0pt, Height = 77.0pt)
+    // 3 Columns: Col 1 = 67.5pt (135px @ 2.0x, w=234pt/468px)
+    //            Col 2 = 304.5pt (609px @ 2.0x, w=232.5pt/465px)
+    //            Col 3 = 541.5pt (1083px @ 2.0x, w=232.5pt/465px)
+    // Page 3 (First voter page): 5 rows starting at Y = 114.0pt (228px @ 2.0x)
+    // Page 4+ (Subsequent pages): 6 rows starting at Y = 32.0pt (64px @ 2.0x)
+    // Row step = 81.0pt (162px @ 2.0x), Height = 78.0pt (156px @ 2.0x)
     if (isLandscape) {
-      const COL_XS_PT = [67.8, 304.4, 541.0];
-      const CARD_W_PT = 232.6;
-      const CARD_H_PT = 77.0;
+      const COL_DEFS_PT = [
+        { x: 67.5, w: 234.0 },
+        { x: 304.5, w: 232.5 },
+        { x: 541.5, w: 232.5 }
+      ];
+      const CARD_H_PT = 78.0;
       const ROW_STEP_PT = 81.0;
-      let startYPt = isFirstVoterPage ? 114.2 : 32.2;
+      let startYPt = isFirstVoterPage ? 114.0 : 32.0;
       const maxRows = isFirstVoterPage ? 5 : 6;
 
       const scaleX = w / 842.4;
       const scaleY = h / 597.6;
 
-      // Dynamic header detection:
-      // Page 3 (isFirstVoterPage=true): summary table top horizontal line is between 95pt and 140pt
-      // Page 4+ (isFirstVoterPage=false): subsequent table top horizontal line is between 25pt and 65pt
+      // Dynamic header detection (scans for horizontal table line matching python)
       if (canvas) {
         try {
           const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -311,8 +318,7 @@
               if (lum < 185) darkCount++;
             }
             if (darkCount > scanW * 0.70) {
-              const detectedYPt = (scanStartY + ry) / scaleY;
-              startYPt = detectedYPt + 1.0;
+              startYPt = (scanStartY + ry) / scaleY;
               break;
             }
           }
@@ -321,17 +327,16 @@
         }
       }
 
-      const cardWidth = Math.round(CARD_W_PT * scaleX);
-      const cardHeight = Math.round(CARD_H_PT * scaleY);
-
       for (let r = 0; r < maxRows; r++) {
         const rowYPt = startYPt + (r * ROW_STEP_PT);
         const rowY = Math.round(rowYPt * scaleY);
+        const cardHeight = Math.round(CARD_H_PT * scaleY);
         if (rowY + cardHeight > h * 0.99) break;
 
         for (let c = 0; c < 3; c++) {
-          const colXPt = COL_XS_PT[c];
-          const colX = Math.round(colXPt * scaleX);
+          const colDef = COL_DEFS_PT[c];
+          const colX = Math.round(colDef.x * scaleX);
+          const cardWidth = Math.round(colDef.w * scaleX);
           boxes.push({
             x: colX,
             y: rowY,
@@ -340,9 +345,9 @@
             row: r,
             col: c,
             ptRect: {
-              x0: colXPt,
+              x0: colDef.x,
               y0: rowYPt,
-              x1: colXPt + CARD_W_PT,
+              x1: colDef.x + colDef.w,
               y1: rowYPt + CARD_H_PT
             }
           });
@@ -386,13 +391,20 @@
   async function slicePdfFile(file, options = {}, callbacks = {}) {
     const { onProgress, onLog, onFinished } = callbacks;
     try {
-      const lines = options.lines || 2; // Default to 2 lines (Serial, Name, Voter No)
+      const lines = Number(options.lines || 2); // Default to 2 lines (Serial, Name, Voter No)
       // Exact ratio map matching python pdf_slice.py:
       const ratioMap = { 1: 0.15, 2: 0.25, 3: 0.415, 4: 0.54, 5: 0.675, 6: 0.82 };
-      const lineRatio = ratioMap[lines] || 0.25;
-      const shaveTop = options.shaveTop || 3;
-      const shaveLeft = options.shaveLeft || 3;
-      const resolutionScale = options.resolutionScale || 2.0;
+      const lineRatio = ratioMap[lines] !== undefined ? ratioMap[lines] : Math.min(1.0, lines * 0.14);
+      const resolutionScale = Number(options.resolutionScale) || 2.0;
+
+      const defaultShave = Math.abs(resolutionScale - 3.0) < 0.2 ? 4 : 3;
+      const shaveTop = (options.shaveTop !== undefined && options.shaveTop !== null) ? Number(options.shaveTop) : defaultShave;
+      const shaveLeft = (options.shaveLeft !== undefined && options.shaveLeft !== null) ? Number(options.shaveLeft) : defaultShave;
+      const padTop = Number(options.padTop || 0);
+      const padBottom = Number(options.padBottom || 0);
+      const padLeft = Number(options.padLeft || 0);
+      const padRight = Number(options.padRight || 0);
+      const hideBorders = options.hideBorders !== false;
 
       if (onLog) onLog(`📄 পিডিএফ ফাইল খোলা হচ্ছে: ${file.name}...\n`);
 
@@ -425,8 +437,15 @@
         let hideDataUrl = "";
 
         for (let box of boxes) {
-          const cropW = box.w - shaveLeft - 15;
-          const trimmed = autoTrimRightWhitespace(pageCanvas, box.x + shaveLeft, box.y + shaveTop, cropW, Math.round(box.h * lineRatio), 20, lines === 2);
+          const startY = Math.max(0, box.y + shaveTop + padTop);
+          const rawCropH = Math.round(box.h * lineRatio);
+          const targetH = Math.max(15, rawCropH - padBottom);
+
+          const startX = Math.max(0, box.x + shaveLeft + padLeft);
+          const rawCropW = box.w - 15 - padRight;
+          const targetW = Math.max(30, rawCropW - (shaveLeft + padLeft));
+
+          const trimmed = autoTrimRightWhitespace(pageCanvas, startX, startY, targetW, targetH, 22, lines === 2);
           if (trimmed) {
             selectedBox = box;
             hideDataUrl = trimmed.dataUrl;
@@ -451,13 +470,19 @@
           uCtx.drawImage(pageCanvas, selectedBox.x, selectedBox.y, selectedBox.w, selectedBox.h, 0, 0, selectedBox.w, selectedBox.h);
           unhideDataUrl = uCanvas.toDataURL('image/jpeg', 0.85);
 
-          const cropW = selectedBox.w - shaveLeft - 15;
-          const cropH = Math.round(selectedBox.h * lineRatio);
+          const startY = Math.max(0, selectedBox.y + shaveTop + padTop);
+          const rawCropH = Math.round(selectedBox.h * lineRatio);
+          const targetH = Math.max(15, rawCropH - padBottom);
+
+          const startX = Math.max(0, selectedBox.x + shaveLeft + padLeft);
+          const rawCropW = selectedBox.w - 15 - padRight;
+          const targetW = Math.max(30, rawCropW - (shaveLeft + padLeft));
+
           const hCanvas = document.createElement('canvas');
-          hCanvas.width = cropW;
-          hCanvas.height = cropH;
+          hCanvas.width = targetW;
+          hCanvas.height = targetH;
           const hCtx = hCanvas.getContext('2d');
-          hCtx.drawImage(pageCanvas, selectedBox.x + shaveLeft, selectedBox.y + shaveTop, cropW, cropH, 0, 0, cropW, cropH);
+          hCtx.drawImage(pageCanvas, startX, startY, targetW, targetH, 0, 0, targetW, targetH);
           hideDataUrl = hCanvas.toDataURL('image/jpeg', 0.85);
         } else {
           // Proportional fallback from page
@@ -558,14 +583,33 @@
           if (!hasValidVoterIndicator(cardText)) continue;
         }
 
-        // Crop top portion based on lineRatio (0.28 for 2 lines)
-        const cropY = box.y + shaveTop;
-        const cropH = Math.round(box.h * lineRatio);
-        const cropX = box.x + shaveLeft;
-        const cropW = box.w - shaveLeft - 15; // Strictly exclude right card border line
+        // Crop based on hideBorders, shaveTop/shaveLeft, padTop/padBottom/padLeft/padRight (100% exact match with python pdf_slice.py)
+        let trimmed;
+        if (hideBorders) {
+          const cropY = Math.max(0, box.y + shaveTop + padTop);
+          const rawCropH = Math.round(box.h * lineRatio);
+          const cropH = Math.max(15, rawCropH - padBottom);
 
-        // Apply Ultra-Fast Smart Right-Whitespace Auto-Trim (RAM-only pixel access)
-        const trimmed = autoTrimRightWhitespaceFromPageData(pageImageData, pageCanvas, cropX, cropY, cropW, cropH, 20, lines === 2);
+          const cropX = Math.max(0, box.x + shaveLeft + padLeft);
+          const rawCropW = box.w - 15 - padRight;
+          const cropW = Math.max(30, rawCropW - (shaveLeft + padLeft));
+
+          trimmed = autoTrimRightWhitespaceFromPageData(pageImageData, pageCanvas, cropX, cropY, cropW, cropH, 22, lines === 2);
+        } else {
+          const cropX = Math.max(0, box.x + padLeft);
+          const cropY = Math.max(0, box.y + padTop);
+          const cropW = Math.max(30, box.w - padRight - padLeft);
+          const cropH = Math.max(30, box.h - padBottom - padTop);
+
+          sharedTrimCanvas.width = cropW;
+          sharedTrimCanvas.height = cropH;
+          sharedTrimCtx.drawImage(pageCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+          trimmed = {
+            dataUrl: sharedTrimCanvas.toDataURL('image/jpeg', 0.85),
+            width: cropW,
+            height: cropH
+          };
+        }
         if (!trimmed) continue; // Skip blank or cancelled card
 
         const cardIndex = totalCardsExtracted + 1;
@@ -920,8 +964,32 @@
     return true;
   }
 
+  // Dynamic Backend Discovery: Checks Localhost and Configured Cloud Python Microservice
+  async function checkBackendAvailability() {
+    const candidates = [];
+    const custom = (localStorage.getItem('voterslip_cloud_slicer_url') || '').trim().replace(/\/+$/, '');
+    if (custom) candidates.push(custom);
+    candidates.push(''); // relative (for localhost)
+
+    for (const base of candidates) {
+      try {
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(`${base}/api/check-backend-slicer`, { signal: controller.signal }).catch(() => null);
+        clearTimeout(tid);
+        if (res && res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data && data.available) {
+            return { available: true, base };
+          }
+        }
+      } catch (e) {}
+    }
+    return { available: false, base: '' };
+  }
+
   // Ultra-Fast Backend Python Slicer Runner (Native PyMuPDF + OpenCV C++ at ~80+ cards/sec)
-  async function runBackendSlicing(options, files, outputDirPath) {
+  async function runBackendSlicing(options, files, outputDirPath, backendBase = '') {
     const rawVal = options.inputDir || (document.getElementById("slicerInputDir") ? document.getElementById("slicerInputDir").value : "");
     const cleanIn = cleanPathStr(rawVal);
     let uploadedPdfs = null;
@@ -930,7 +998,7 @@
     // If browser files are selected and no local path is resolved, convert files to base64
     if (!cleanIn && files && files.length > 0) {
       if (window.slicer && window.slicer.triggerLog) {
-        window.slicer.triggerLog(`🚀 হাই-স্পিড নেটিভ ব্যাকএন্ড ইঞ্জিনে ফাইল প্রস্তুত করা হচ্ছে (${files.length} টি PDF)...\n`);
+        window.slicer.triggerLog(`🚀 হাই-স্পিড পাইথন ইঞ্জিনে ফাইল প্রস্তুত করা হচ্ছে (${files.length} টি PDF)...\n`);
       }
       const filesToUpload = (options.previewOnly && files.length > 1) ? [files[0]] : files;
       uploadedPdfs = [];
@@ -958,13 +1026,30 @@
     };
 
     let response;
+    const controller = new AbortController();
+    const isCloud = backendBase.startsWith('http://') || backendBase.startsWith('https://');
+    const timeoutMs = isCloud ? 45000 : 15000; // 45s for Render free-tier cold starts (smart-mohuri architecture)
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    let wakeupTimer = null;
+    if (isCloud && window.slicer && window.slicer.triggerLog) {
+      wakeupTimer = setTimeout(() => {
+        window.slicer.triggerLog(`⏳ ক্লাউড পাইথন সার্ভার ওয়েকআপ হচ্ছে (Render Cold-Start)... অনুগ্রহ করে ১৫-২০ সেকেন্ড অপেক্ষা করুন...\n`);
+      }, 2500);
+    }
+
     try {
-      response = await fetch('/api/run-slicer-backend', {
+      response = await fetch(`${backendBase}/api/run-slicer-backend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
+      if (wakeupTimer) clearTimeout(wakeupTimer);
     } catch (netErr) {
+      clearTimeout(timeoutId);
+      if (wakeupTimer) clearTimeout(wakeupTimer);
       console.warn("Backend slicer fetch failed:", netErr);
       return false;
     }
@@ -1013,6 +1098,20 @@
           }
           if (data.status === 'stderr') {
             window.slicer.triggerStderr(data.message);
+            continue;
+          }
+          if (data.status === 'zip_ready') {
+            if (window.slicer && window.slicer.triggerLog) {
+              window.slicer.triggerLog(`📦 মোট ${data.total_cards} টি ভোটার কার্ড ক্লাউড পাইথন দ্বারা সফলভাবে স্লাইস ও জিপ করা হয়েছে!\n`);
+            }
+            if (data.zip_data_url) {
+              const a = document.createElement('a');
+              a.href = data.zip_data_url;
+              a.download = `Sliced_Voter_Cards_${Date.now()}.zip`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }
             continue;
           }
           if (data.boxes_detected !== undefined) {
@@ -1084,15 +1183,12 @@
 
         // Preview Only handling
         if (options && options.previewOnly) {
-          // If backend python slicer is available, use it for 100% accurate native preview!
+          // Check backend availability (Localhost or Cloud Render Python Service)
           try {
-            const checkRes = await fetch('/api/check-backend-slicer').catch(() => null);
-            if (checkRes && checkRes.ok) {
-              const checkData = await checkRes.json();
-              if (checkData.available) {
-                const nativeDone = await runBackendSlicing({ ...options, inputDir: cleanIn }, files, "");
-                if (nativeDone) return;
-              }
+            const backend = await checkBackendAvailability();
+            if (backend.available) {
+              const nativeDone = await runBackendSlicing({ ...options, inputDir: cleanIn }, files, "", backend.base);
+              if (nativeDone) return;
             }
           } catch (e) {
             console.warn("Backend slicer preview attempt failed, falling back to browser engine:", e);
@@ -1146,13 +1242,10 @@
         // 1. Ultra-Fast Native Backend Slicer Runner (Python PyMuPDF + OpenCV C++ at ~80+ cards/sec)
         if (outputDirPath && !options.previewOnly) {
           try {
-            const checkRes = await fetch('/api/check-backend-slicer').catch(() => null);
-            if (checkRes && checkRes.ok) {
-              const checkData = await checkRes.json();
-              if (checkData.available) {
-                const nativeDone = await runBackendSlicing(options, files, outputDirPath);
-                if (nativeDone) return;
-              }
+            const backend = await checkBackendAvailability();
+            if (backend.available) {
+              const nativeDone = await runBackendSlicing(options, files, outputDirPath, backend.base);
+              if (nativeDone) return;
             }
           } catch (e) {
             console.warn("Backend slicer attempt failed, falling back to browser engine:", e);

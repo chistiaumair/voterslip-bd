@@ -1,0 +1,24 @@
+FROM python:3.11-slim
+
+# Install system runtime dependencies for OpenCV and PyMuPDF
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy dependency requirements first for layer caching
+COPY slicer-service/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source files
+COPY slicer-service/ ./slicer-service/
+COPY votcenter/ ./votcenter/
+
+ENV PYTHONUNBUFFERED=1
+ENV PORT=5000
+
+EXPOSE 5000
+
+CMD ["python", "slicer-service/app.py"]

@@ -752,9 +752,18 @@
                       style="width: 100%; box-sizing: border-box; background: #111827; border: 1px solid #4b5563; padding: 6px; border-radius: 6px; color: white; font-size: 11px; margin-top: 2px;" />
                   </div>
                   <div class="size-control">
-                    <label for="slicerPadLeft" style="font-size: 10px; color: #cbd5e1;">বামের মার্জিন (Pad
-                      Left):</label>
+                    <label for="slicerPadBottom" style="font-size: 10px; color: #cbd5e1;">নিচের মার্জিন (Pad Bottom):</label>
+                    <input type="number" id="slicerPadBottom" value="0" step="1"
+                      style="width: 100%; box-sizing: border-box; background: #111827; border: 1px solid #4b5563; padding: 6px; border-radius: 6px; color: white; font-size: 11px; margin-top: 2px;" />
+                  </div>
+                  <div class="size-control">
+                    <label for="slicerPadLeft" style="font-size: 10px; color: #cbd5e1;">বামের মার্জিন (Pad Left):</label>
                     <input type="number" id="slicerPadLeft" value="0" step="1"
+                      style="width: 100%; box-sizing: border-box; background: #111827; border: 1px solid #4b5563; padding: 6px; border-radius: 6px; color: white; font-size: 11px; margin-top: 2px;" />
+                  </div>
+                  <div class="size-control">
+                    <label for="slicerPadRight" style="font-size: 10px; color: #cbd5e1;">ডানের মার্জিন (Pad Right):</label>
+                    <input type="number" id="slicerPadRight" value="0" step="1"
                       style="width: 100%; box-sizing: border-box; background: #111827; border: 1px solid #4b5563; padding: 6px; border-radius: 6px; color: white; font-size: 11px; margin-top: 2px;" />
                   </div>
                   <div class="size-control">
@@ -768,6 +777,25 @@
                       Left):</label>
                     <input type="number" id="slicerShaveLeft" value="3" step="1"
                       style="width: 100%; box-sizing: border-box; background: #111827; border: 1px solid #4b5563; padding: 6px; border-radius: 6px; color: white; font-size: 11px; margin-top: 2px;" />
+                  </div>
+                </div>
+
+                <!-- Cloud Python Microservice Engine (Render / Smart-Mohuri architecture) -->
+                <div style="margin-top: 12px; padding: 10px; background: rgba(15, 23, 42, 0.6); border: 1px solid #334155; border-radius: 8px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 11px; font-weight: bold; color: #38bdf8; display: flex; align-items: center; gap: 5px;">
+                      <span>🐍</span> ক্লাউড পাইথন ইঞ্জিন (Render):
+                    </span>
+                    <span id="cloudSlicerStatusBadge" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #1e293b; color: #94a3b8; border: 1px solid #475569;">চেক হচ্ছে...</span>
+                  </div>
+                  <div style="display: flex; gap: 5px;">
+                    <input type="text" id="cloudSlicerUrlInput" placeholder="যেমন: https://voterslip-cloud-slicer.onrender.com"
+                      style="flex: 1; font-size: 10px; background: #0f172a; border: 1px solid #475569; padding: 6px 8px; border-radius: 6px; color: #f1f5f9; outline: none;" />
+                    <button type="button" id="testCloudSlicerBtn"
+                      style="padding: 0 10px; font-size: 10px; background: #0ea5e9; color: white; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: bold;">কানেক্ট</button>
+                  </div>
+                  <div style="font-size: 9.5px; color: #94a3b8; margin-top: 5px; line-height: 1.3;">
+                    * ক্লাউড পাইথন যুক্ত থাকলে PyMuPDF + OpenCV রিয়েল-টাইমে ক্লাউডে চলবে। ফাঁকা রাখলে ১০০% নির্ভুল ব্রাউজার ইঞ্জিন স্লাইস করবে।
                   </div>
                 </div>
               </div>
@@ -8821,7 +8849,9 @@
       const slicerResolutionScaleSelect = document.getElementById("slicerResolutionScale");
       const slicerNumLinesSelect = document.getElementById("slicerNumLines");
       const slicerPadTopInput = document.getElementById("slicerPadTop");
+      const slicerPadBottomInput = document.getElementById("slicerPadBottom");
       const slicerPadLeftInput = document.getElementById("slicerPadLeft");
+      const slicerPadRightInput = document.getElementById("slicerPadRight");
       const slicerShaveTopInput = document.getElementById("slicerShaveTop");
       const slicerShaveLeftInput = document.getElementById("slicerShaveLeft");
 
@@ -8857,9 +8887,9 @@
           hideBorders: slicerHideBordersCheckbox ? slicerHideBordersCheckbox.checked : false,
           previewOnly: previewOnly,
           padTop: parseInt(slicerPadTopInput?.value) || 0,
-          padBottom: 0,
+          padBottom: parseInt(slicerPadBottomInput?.value) || 0,
           padLeft: parseInt(slicerPadLeftInput?.value) || 0,
-          padRight: 0,
+          padRight: parseInt(slicerPadRightInput?.value) || 0,
           shaveTop: slicerShaveTopInput ? parseInt(slicerShaveTopInput.value) : 3,
           shaveLeft: slicerShaveLeftInput ? parseInt(slicerShaveLeftInput.value) : 3,
           resolutionScale: parseFloat(slicerResolutionScaleSelect.value) || 2.0,
@@ -9355,7 +9385,9 @@
 
       const defaultShaveVal = (slicerResolutionScaleSelect && slicerResolutionScaleSelect.value === "3.0") ? "4" : "3";
       if (slicerPadTopInput) slicerPadTopInput.value = localStorage.getItem("slicerPadTop") || "0";
+      if (slicerPadBottomInput) slicerPadBottomInput.value = localStorage.getItem("slicerPadBottom") || "0";
       if (slicerPadLeftInput) slicerPadLeftInput.value = localStorage.getItem("slicerPadLeft") || "0";
+      if (slicerPadRightInput) slicerPadRightInput.value = localStorage.getItem("slicerPadRight") || "0";
       if (slicerShaveTopInput) slicerShaveTopInput.value = localStorage.getItem("slicerShaveTop") || defaultShaveVal;
       if (slicerShaveLeftInput) slicerShaveLeftInput.value = localStorage.getItem("slicerShaveLeft") || defaultShaveVal;
 
@@ -9384,7 +9416,7 @@
         });
       }
 
-      [slicerPadTopInput, slicerPadLeftInput, slicerShaveTopInput, slicerShaveLeftInput].forEach(input => {
+      [slicerPadTopInput, slicerPadBottomInput, slicerPadLeftInput, slicerPadRightInput, slicerShaveTopInput, slicerShaveLeftInput].forEach(input => {
         if (input) {
           input.addEventListener("input", () => {
             localStorage.setItem(input.id, input.value);
@@ -9392,6 +9424,78 @@
           });
         }
       });
+
+      // Cloud Slicer UI Controller
+      const cloudSlicerUrlInput = document.getElementById("cloudSlicerUrlInput");
+      const testCloudSlicerBtn = document.getElementById("testCloudSlicerBtn");
+      const cloudSlicerStatusBadge = document.getElementById("cloudSlicerStatusBadge");
+
+      async function updateCloudSlicerStatus() {
+        if (!cloudSlicerStatusBadge) return;
+        const storedUrl = localStorage.getItem('voterslip_cloud_slicer_url') || '';
+        if (cloudSlicerUrlInput && storedUrl) {
+          cloudSlicerUrlInput.value = storedUrl;
+        }
+        cloudSlicerStatusBadge.textContent = "চেক হচ্ছে...";
+        cloudSlicerStatusBadge.style.color = "#94a3b8";
+
+        let targetBase = storedUrl ? storedUrl.trim().replace(/\/+$/, '') : '';
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (!targetBase && isLocal) targetBase = '';
+
+        try {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 4000);
+          const res = await fetch(`${targetBase}/api/check-backend-slicer`, { signal: controller.signal }).catch(() => null);
+          clearTimeout(tid);
+          if (res && res.ok) {
+            const d = await res.json().catch(() => null);
+            if (d && d.available) {
+              cloudSlicerStatusBadge.textContent = "🟢 সংযুক্ত (Python Active)";
+              cloudSlicerStatusBadge.style.color = "#4ade80";
+              return;
+            }
+          }
+        } catch (e) {}
+
+        if (storedUrl) {
+          cloudSlicerStatusBadge.textContent = "🟡 অফলাইন / স্লিপিং";
+          cloudSlicerStatusBadge.style.color = "#facc15";
+        } else {
+          cloudSlicerStatusBadge.textContent = "🟡 ব্রাউজার ইঞ্জিন";
+          cloudSlicerStatusBadge.style.color = "#94a3b8";
+        }
+      }
+
+      if (testCloudSlicerBtn && cloudSlicerUrlInput) {
+        testCloudSlicerBtn.addEventListener("click", async () => {
+          const raw = cloudSlicerUrlInput.value.trim().replace(/\/+$/, '');
+          localStorage.setItem('voterslip_cloud_slicer_url', raw);
+          cloudSlicerStatusBadge.textContent = "কানেক্ট হচ্ছে...";
+          cloudSlicerStatusBadge.style.color = "#38bdf8";
+          try {
+            const controller = new AbortController();
+            const tid = setTimeout(() => controller.abort(), 15000);
+            const res = await fetch(`${raw}/api/check-backend-slicer`, { signal: controller.signal });
+            clearTimeout(tid);
+            if (res.ok) {
+              const d = await res.json();
+              if (d && d.available) {
+                cloudSlicerStatusBadge.textContent = "🟢 কানেক্টেড!";
+                cloudSlicerStatusBadge.style.color = "#4ade80";
+                alert(`✅ ক্লাউড পাইথন মাইক্রোসার্ভিস সফলভাবে কানেক্ট হয়েছে!\nসার্ভিস: ${d.service || 'voterslip-cloud-python'}\nইঞ্জিন: ${d.engine || 'Python PyMuPDF + OpenCV'}`);
+                triggerAutoPreview();
+                return;
+              }
+            }
+          } catch (e) {
+            cloudSlicerStatusBadge.textContent = "❌ কানেক্ট হয়নি";
+            cloudSlicerStatusBadge.style.color = "#f87171";
+            alert("ক্লাউড সার্ভারের সাথে কানেক্ট করা যায়নি। URL ঠিক আছে কিনা এবং Render সার্ভিস রানিং আছে কিনা চেক করুন।");
+          }
+        });
+      }
+      setTimeout(updateCloudSlicerStatus, 1000);
 
       function updatePreviewImage() {
         if (!lastUnhidePath && !lastHidePath) return;
