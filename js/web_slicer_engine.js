@@ -179,9 +179,9 @@
 
     const data = pageImgData.data;
 
-    // Ignore residual horizontal line on top 1-5 rows ONLY (100% exact match with python pdf_slice.py line 278)
-    const isTopBorderRow = new Array(Math.min(5, height)).fill(false);
-    for (let r = 0; r < Math.min(5, height); r++) {
+    // Ignore horizontal border lines across the card (if any row has >35% dark pixels, it's a border/line, not text)
+    const isSolidLineRow = new Array(height).fill(false);
+    for (let r = 0; r < height; r++) {
       let rDark = 0;
       const rowOffset = (startY + r) * pW * 4;
       for (let c = 0; c < width; c++) {
@@ -190,7 +190,7 @@
         if (lum < 185) rDark++;
       }
       if (rDark > width * 0.35) {
-        isTopBorderRow[r] = true;
+        isSolidLineRow[r] = true;
       }
     }
 
@@ -201,7 +201,7 @@
       let darkCount = 0;
       const colX = startX + col;
       for (let row = 0; row < height; row++) {
-        if (row < 5 && isTopBorderRow[row]) continue; // Ignore residual top border line ONLY
+        if (isSolidLineRow[row]) continue; // Ignore horizontal border lines
         const idx = ((startY + row) * pW + colX) * 4;
         const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
         if (lum < 195) { // Sensitive to antialiased font pixels
@@ -224,15 +224,9 @@
     // target_w = max(min_w, min(cropped_hide.shape[1], max_col + 22))
     const resolutionScale = (srcCanvas.width / 842.0) || 2.0;
     const minWidth = Math.round(250 * (resolutionScale / 2.0));
-    let trimmedWidth = (maxCol > 0)
+    const trimmedWidth = (maxCol > 0)
       ? Math.max(minWidth, Math.min(width, maxCol + padRight))
       : minWidth;
-
-    // For 2-line mode ("ক্রমিক, নাম, ভোটার নং"), clamp to standard width so preview is never 450px
-    if (is2LineMode) {
-      trimmedWidth = Math.min(trimmedWidth, Math.round(350 * (resolutionScale / 2.0)));
-      if (maxCol === 0 || trimmedWidth < minWidth) trimmedWidth = minWidth;
-    }
 
     // Smart Bottom Trim: Prune any Line 3 Father's name kar signs if present (matching pdf_slice.py line 290)
     let finalH = height;
@@ -300,7 +294,7 @@
       ];
       const CARD_H_PT = 78.0;
       const ROW_STEP_PT = 81.0;
-      let startYPt = isFirstVoterPage ? 114.0 : 32.0;
+      let startYPt = isFirstVoterPage ? 114.2 : 32.2;
       const maxRows = isFirstVoterPage ? 5 : 6;
 
       const scaleX = w / 842.4;
@@ -310,8 +304,8 @@
       if (canvas) {
         try {
           const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          const scanStartY = Math.round((isFirstVoterPage ? 95 : 25) * scaleY);
-          const scanEndY = Math.round((isFirstVoterPage ? 140 : 65) * scaleY);
+          const scanStartY = Math.round((isFirstVoterPage ? 111 : 27) * scaleY);
+          const scanEndY = Math.round((isFirstVoterPage ? 120 : 38) * scaleY);
           const scanX = Math.round(70 * scaleX);
           const scanW = Math.round(150 * scaleX);
           const imgData = ctx.getImageData(scanX, scanStartY, scanW, scanEndY - scanStartY);
@@ -975,6 +969,8 @@
     if (!p) return false;
     const clean = cleanPathStr(p);
     if (!clean || clean.startsWith('blob:') || clean.startsWith('data:')) return false;
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    if (!isLocal && !window.slicer?.isElectron) return false;
     return true;
   }
 
@@ -1216,10 +1212,13 @@
             });
             return;
           } else {
-            window.slicer.triggerFinished({
-              code: -1,
-              error: cleanIn ? `ইনপুট ফোল্ডার বা ফাইলে কোনো পিডিএফ পাওয়া যায়নি (${cleanIn})` : 'কোনো ইনপুট ফোল্ডার নির্ধারণ করা হয়নি'
-            });
+            const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+            if (isLocal && cleanIn) {
+              window.slicer.triggerFinished({
+                code: -1,
+                error: `ইনপুট ফোল্ডার বা ফাইলে কোনো পিডিএফ পাওয়া যায়নি (${cleanIn})`
+              });
+            }
             return;
           }
         }

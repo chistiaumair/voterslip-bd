@@ -697,21 +697,10 @@
                   style="width: auto; padding: 0 10px; height: 34px; font-size: 11px; background-color: #3b82f6; color: white;">সিলেক্ট</button>
               </div>
               <input type="file" id="slicerFolderInput" webkitdirectory directory multiple style="display: none;" />
+              <input type="file" id="slicerFileInput" accept=".pdf" multiple style="display: none;" />
             </div>
             <div class="size-control" style="width: 100%;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                <label style="margin: 0;">আউটপুট ফোল্ডার (Images):</label>
-                <div style="display: flex; gap: 8px; font-size: 10px;">
-                  <label style="display: flex; align-items: center; gap: 3px; cursor: pointer; color: #38bdf8;" title="সরাসরি আপনার কম্পিউটারের ফোল্ডারে সেভ হবে (কোনো ZIP হবে না)">
-                    <input type="radio" name="slicerSaveMode" id="slicerSaveModeDirect" value="direct" checked style="cursor: pointer;" />
-                    <span>📂 সরাসরি ফোল্ডারে (No ZIP)</span>
-                  </label>
-                  <label style="display: flex; align-items: center; gap: 3px; cursor: pointer; color: #94a3b8;" title="সকল ছবি একসাথে একটি ZIP ফাইলে ডাউনলোড হবে">
-                    <input type="radio" name="slicerSaveMode" id="slicerSaveModeZip" value="zip" style="cursor: pointer;" />
-                    <span>📦 ZIP ডাউনলোড</span>
-                  </label>
-                </div>
-              </div>
+              <label>আউটপুট ফোল্ডার (Images):</label>
               <div style="display: flex; gap: 5px; margin-top: 4px; width: 100%;">
                 <input type="text" id="slicerOutputDir" placeholder="আউটপুট ফোল্ডার সিলেক্ট বা টাইপ করুন"
                   style="flex: 1; font-size: 11px; background: #111827; border: 1px solid #4b5563; padding: 8px; border-radius: 8px; color: white;" />
@@ -8947,15 +8936,12 @@
       let isFullSlicing = false;
 
       function getSlicerOptions(previewOnly = false) {
-        const saveModeEl = document.querySelector('input[name="slicerSaveMode"]:checked');
-        const saveMode = saveModeEl ? saveModeEl.value : 'direct';
         return {
           inputDir: slicerInputDirInput.value,
           outputDir: slicerOutputDirInput ? slicerOutputDirInput.value.replace(/^[📁📦]\s*/, '').replace(/\s*\(.*\)$/, '').trim() : "VoterCards",
           cleanup: true,
           hideBorders: slicerHideBordersCheckbox ? slicerHideBordersCheckbox.checked : false,
           previewOnly: previewOnly,
-          saveMode: saveMode,
           padTop: parseInt(slicerPadTopInput?.value) || 0,
           padBottom: parseInt(slicerPadBottomInput?.value) || 0,
           padLeft: parseInt(slicerPadLeftInput?.value) || 0,
@@ -8971,6 +8957,18 @@
         if (isFullSlicing) return;
         const inputDir = slicerInputDirInput ? slicerInputDirInput.value : "";
         if (!inputDir) return;
+
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const files = window.__webSelectedPdfs || [];
+        if (!isLocal && files.length === 0) {
+          if (slicerPreviewPlaceholder) {
+            slicerPreviewPlaceholder.style.display = "block";
+            slicerPreviewPlaceholder.textContent = "📄 প্রিভিউ দেখতে ইনপুট ফোল্ডার বা PDF ফাইল সিলেক্ট করুন";
+          }
+          if (slicerPreviewImg) slicerPreviewImg.style.display = "none";
+          if (slicerPreviewDimensionBadge) slicerPreviewDimensionBadge.style.display = "none";
+          return;
+        }
 
         const options = getSlicerOptions(true);
         isSlicing = true;
@@ -9058,6 +9056,23 @@
           const sample = pdfFiles[0];
           const folderName = (sample.webkitRelativePath) ? sample.webkitRelativePath.split('/')[0] : "ফোল্ডার";
           slicerInputDirInput.value = `${folderName} (${pdfFiles.length} টি PDF)`;
+          localStorage.setItem("slicerInputDir", slicerInputDirInput.value);
+
+          triggerAutoPreview();
+        });
+      }
+
+      // Web Direct PDF Files Selection Change Listener
+      const slicerFileInput = document.getElementById("slicerFileInput");
+      if (slicerFileInput) {
+        slicerFileInput.addEventListener("change", (e) => {
+          const allFiles = Array.from(e.target.files || []);
+          const pdfFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+          if (pdfFiles.length === 0) return;
+          pdfFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+          window.__webSelectedPdfs = pdfFiles;
+
+          slicerInputDirInput.value = pdfFiles.length === 1 ? pdfFiles[0].name : `${pdfFiles.length} টি PDF ফাইল`;
           localStorage.setItem("slicerInputDir", slicerInputDirInput.value);
 
           triggerAutoPreview();
@@ -9200,7 +9215,7 @@
                   const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
                   if (dirHandle) {
                     window.__slicerOutputDirHandle = dirHandle;
-                    if (slicerOutputDirInput) slicerOutputDirInput.value = `📁 ${dirHandle.name}`;
+                    if (slicerOutputDirInput) slicerOutputDirInput.value = dirHandle.name;
                     localStorage.setItem("slicerOutputDir", dirHandle.name);
                     closeSlicerModal();
                     return;
@@ -9210,7 +9225,7 @@
             }},
             { label: '📦 ZIP ডাউনলোড মোড', color: '#0284c7', action: () => {
               window.__slicerOutputDirHandle = null;
-              if (slicerOutputDirInput) slicerOutputDirInput.value = "📦 VoterCards (স্বয়ংক্রিয় ZIP ডাউনলোড)";
+              if (slicerOutputDirInput) slicerOutputDirInput.value = "VoterCards";
               localStorage.setItem("slicerOutputDir", "VoterCards");
               closeSlicerModal();
             }},
@@ -9255,7 +9270,7 @@
                   const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
                   if (dirHandle) {
                     window.__slicerOutputDirHandle = dirHandle;
-                    if (slicerOutputDirInput) slicerOutputDirInput.value = `📁 ${dirHandle.name}`;
+                    if (slicerOutputDirInput) slicerOutputDirInput.value = dirHandle.name;
                     localStorage.setItem("slicerOutputDir", dirHandle.name);
                     closeSlicerModal();
                     return;
@@ -9271,7 +9286,7 @@
           if (zBtn) {
             zBtn.onclick = () => {
               window.__slicerOutputDirHandle = null;
-              if (slicerOutputDirInput) slicerOutputDirInput.value = "📦 VoterCards (স্বয়ংক্রিয় ZIP ডাউনলোড)";
+              if (slicerOutputDirInput) slicerOutputDirInput.value = "VoterCards";
               localStorage.setItem("slicerOutputDir", "VoterCards");
               closeSlicerModal();
             };
@@ -9530,7 +9545,7 @@
               const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
               if (dirHandle) {
                 window.__slicerOutputDirHandle = dirHandle;
-                slicerOutputDirInput.value = `📁 ${dirHandle.name}`;
+                slicerOutputDirInput.value = dirHandle.name;
                 localStorage.setItem("slicerOutputDir", dirHandle.name);
                 return;
               }
@@ -9588,9 +9603,9 @@
       if (slicerOutputDirInput) {
         const savedOut = localStorage.getItem("slicerOutputDir");
         if (savedOut && savedOut.trim()) {
-          slicerOutputDirInput.value = (savedOut.startsWith("📁") || savedOut.startsWith("📦")) ? savedOut : `📁 ${savedOut}`;
+          slicerOutputDirInput.value = savedOut.replace(/^[📁📦]\s*/, '').replace(/\s*\(.*\)$/, '').trim();
         } else {
-          slicerOutputDirInput.value = "📁 VoterCards";
+          slicerOutputDirInput.value = "VoterCards";
           localStorage.setItem("slicerOutputDir", "VoterCards");
         }
       }
@@ -9786,38 +9801,26 @@
 
       // Click Slicer Run Button
       if (runSlicerBtn) {
-        runSlicerBtn.addEventListener("click", async () => {
+        runSlicerBtn.addEventListener("click", () => {
           if (isSlicing) return;
           const options = getSlicerOptions(false);
-          if (!options.inputDir) {
+          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          const files = window.__webSelectedPdfs || [];
+
+          if (!options.inputDir || (!isLocal && files.length === 0)) {
             if (selectSlicerInputDirBtn) selectSlicerInputDirBtn.click();
-            else alert("অনুগ্রহ করে ইনপুট ফোল্ডার সিলেক্ট করুন।");
+            else alert("অনুগ্রহ করে ইনপুট ফোল্ডার বা PDF সিলেক্ট করুন।");
             return;
           }
 
-          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-          const isDirectMode = options.saveMode === 'direct';
-
-          // On Web Browser: if direct mode is active and user hasn't chosen folder handle yet, prompt folder picker
-          if (!isLocal && isDirectMode && !window.__slicerOutputDirHandle && 'showDirectoryPicker' in window) {
-            try {
-              const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-              if (handle) {
-                window.__slicerOutputDirHandle = handle;
-                if (slicerOutputDirInput) slicerOutputDirInput.value = `📁 ${handle.name}`;
-                localStorage.setItem("slicerOutputDir", handle.name);
-                options.outputDirHandle = handle;
-              }
-            } catch (err) {
-              if (err.name === 'AbortError') return; // User cancelled folder picker
-              console.warn("showDirectoryPicker failed:", err);
-            }
+          if (window.__slicerOutputDirHandle) {
+            options.outputDirHandle = window.__slicerOutputDirHandle;
           }
 
           let currentOutDir = (options.outputDir || (slicerOutputDirInput ? slicerOutputDirInput.value.trim() : ""));
           if (!currentOutDir && !window.__slicerOutputDirHandle) {
             currentOutDir = "VoterCards";
-            if (slicerOutputDirInput) slicerOutputDirInput.value = "📁 VoterCards";
+            if (slicerOutputDirInput) slicerOutputDirInput.value = "VoterCards";
             localStorage.setItem("slicerOutputDir", "VoterCards");
             options.outputDir = "VoterCards";
           }
@@ -11013,10 +11016,8 @@
         const savedPath = slicerInputDirInput.value.trim().replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
         if (savedPath && typeof loadPdfsFromPath === "function") {
           loadPdfsFromPath(savedPath, false).then(ok => {
-            if (!ok) triggerAutoPreview();
-          }).catch(() => triggerAutoPreview());
-        } else {
-          setTimeout(triggerAutoPreview, 500);
+            if (ok) triggerAutoPreview();
+          }).catch(() => {});
         }
       }
 

@@ -274,8 +274,8 @@ def process_pdf_slicing(input_dir, output_dir, json_mode=False, cleanup=False, h
                 if cropped_hide.size > 0:
                     c_gray = cv2.cvtColor(cropped_hide, cv2.COLOR_BGR2GRAY)
                     dark_mask = c_gray < 180
-                    # Ignore residual horizontal line on top 1-5 rows
-                    for r_i in range(min(5, cropped_hide.shape[0])):
+                    # Ignore horizontal border lines anywhere across the crop
+                    for r_i in range(cropped_hide.shape[0]):
                         if np.sum(dark_mask[r_i, :]) > cropped_hide.shape[1] * 0.35:
                             dark_mask[r_i, :] = False
                     col_counts = np.sum(dark_mask, axis=0)
@@ -481,8 +481,8 @@ def process_pdf_slicing(input_dir, output_dir, json_mode=False, cleanup=False, h
                             if np.sum(dark_mask) < 200:
                                 continue
 
-                            # Ignore residual horizontal line on top 1-5 rows
-                            for r_i in range(min(5, cropped.shape[0])):
+                            # Ignore horizontal border lines anywhere across the crop
+                            for r_i in range(cropped.shape[0]):
                                 if np.sum(dark_mask[r_i, :]) > cropped.shape[1] * 0.35:
                                     dark_mask[r_i, :] = False
                             col_counts = np.sum(dark_mask, axis=0)
