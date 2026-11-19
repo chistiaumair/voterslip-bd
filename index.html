@@ -707,6 +707,7 @@
                 <button type="button" class="generate-btn" id="selectSlicerOutputDirBtn"
                   style="width: auto; padding: 0 10px; height: 34px; font-size: 11px; background-color: #3b82f6; color: white;">সিলেক্ট</button>
               </div>
+              <input type="file" id="slicerOutputDirPicker" webkitdirectory directory style="display: none;" />
             </div>
 
             <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px;">
@@ -1460,7 +1461,7 @@
 
   <script src="./js/jspdf.umd.min.js"></script>
   <script src="./js/pdf.min.js"></script>
-  <script src="./js/web_slicer_engine.js?v=20261115_v3"></script>
+  <script src="./js/web_slicer_engine.js?v=20261119_v5"></script>
   <script src="./js/voter_slip_template.js"></script>
   <script src="./js/home_page.js"></script>
   <script src="./js/token_system.js"></script>
@@ -9019,7 +9020,7 @@
 
       // Select Input Folder
       if (selectSlicerInputDirBtn) {
-        selectSlicerInputDirBtn.addEventListener("click", async () => {
+        selectSlicerInputDirBtn.addEventListener("click", () => {
           if (window.slicer && window.slicer.selectDirectory && !window.slicer.isWebEngine) {
             // Electron Desktop App Mode: native IPC directory selection (100% untouched)
             window.slicer.selectDirectory("Select PDF Input Folder").then(dir => {
@@ -9032,37 +9033,7 @@
             return;
           }
 
-          // Modern Web Browser Mode (Chrome, Edge, Brave, Opera):
-          // Directly open native OS folder picker via showDirectoryPicker!
-          if ('showDirectoryPicker' in window) {
-            try {
-              const dirHandle = await window.showDirectoryPicker();
-              if (dirHandle) {
-                const pdfFiles = [];
-                for await (const entry of dirHandle.values()) {
-                  if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.pdf')) {
-                    const file = await entry.getFile();
-                    pdfFiles.push(file);
-                  }
-                }
-                if (pdfFiles.length === 0) {
-                  alert(`সিলেক্ট করা "${dirHandle.name}" ফোল্ডারে কোনো PDF ফাইল পাওয়া যায়নি!`);
-                  return;
-                }
-                pdfFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-                window.__webSelectedPdfs = pdfFiles;
-                slicerInputDirInput.value = `${dirHandle.name} (${pdfFiles.length} টি PDF)`;
-                localStorage.setItem("slicerInputDir", slicerInputDirInput.value);
-                triggerAutoPreview();
-                return;
-              }
-            } catch (err) {
-              if (err.name === 'AbortError') return; // User cancelled
-              console.warn("showDirectoryPicker for input failed, falling back to input element:", err);
-            }
-          }
-
-          // Fallback to slicerFolderInput for older browsers
+          // Modern Web Browser Mode: Immediately and synchronously open native OS folder picker
           const fi = document.getElementById("slicerFolderInput");
           if (fi) {
             fi.value = "";
@@ -9570,8 +9541,7 @@
             return;
           }
 
-          // Modern Web Browser Mode (Chrome, Edge, Brave, Opera):
-          // Open native OS folder picker directly!
+          // Modern Web Browser Mode: showDirectoryPicker
           if ('showDirectoryPicker' in window) {
             try {
               const dirHandle = await window.showDirectoryPicker();
@@ -9583,22 +9553,28 @@
               }
             } catch (err) {
               if (err.name === 'AbortError') return; // User cancelled
-              console.warn("showDirectoryPicker failed:", err);
+              console.warn("showDirectoryPicker failed, falling back to input element:", err);
             }
           }
 
-          // Fallback if browser does not support showDirectoryPicker (e.g. Firefox)
-          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-          if (isLocal) {
-            try {
-              const res = await fetch('/api/quick-folders').catch(() => null);
-              if (res && res.ok) {
-                openFolderSelectorModal('output');
-                return;
-              }
-            } catch (e) {}
+          // Fallback across all browsers:
+          const op = document.getElementById("slicerOutputDirPicker");
+          if (op) {
+            op.value = "";
+            op.click();
           }
-          openFolderSelectorModal('output');
+        });
+      }
+
+      const slicerOutputDirPicker = document.getElementById("slicerOutputDirPicker");
+      if (slicerOutputDirPicker) {
+        slicerOutputDirPicker.addEventListener("change", (e) => {
+          const files = Array.from(e.target.files || []);
+          if (files.length > 0 && files[0].webkitRelativePath) {
+            const folderName = files[0].webkitRelativePath.split('/')[0];
+            slicerOutputDirInput.value = folderName;
+            localStorage.setItem("slicerOutputDir", folderName);
+          }
         });
       }
 
@@ -9644,11 +9620,10 @@
       }
       if (slicerOutputDirInput) {
         const savedOut = localStorage.getItem("slicerOutputDir");
-        if (savedOut && savedOut.trim()) {
+        if (savedOut && savedOut.trim() && savedOut.trim() !== "VoterCards") {
           slicerOutputDirInput.value = savedOut.replace(/^[📁📦]\s*/, '').replace(/\s*\(.*\)$/, '').trim();
         } else {
-          slicerOutputDirInput.value = "VoterCards";
-          localStorage.setItem("slicerOutputDir", "VoterCards");
+          slicerOutputDirInput.value = "";
         }
       }
 
@@ -9862,8 +9837,6 @@
           let currentOutDir = (options.outputDir || (slicerOutputDirInput ? slicerOutputDirInput.value.trim() : ""));
           if (!currentOutDir && !window.__slicerOutputDirHandle) {
             currentOutDir = "VoterCards";
-            if (slicerOutputDirInput) slicerOutputDirInput.value = "VoterCards";
-            localStorage.setItem("slicerOutputDir", "VoterCards");
             options.outputDir = "VoterCards";
           }
 
@@ -11058,9 +11031,31 @@
         const savedPath = slicerInputDirInput.value.trim().replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
         if (savedPath && typeof loadPdfsFromPath === "function") {
           loadPdfsFromPath(savedPath, false).then(ok => {
-            if (ok) triggerAutoPreview();
+            if (ok) {
+              triggerAutoPreview();
+            } else {
+              const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+              if (!isLocal && slicerPreviewPlaceholder) {
+                slicerPreviewPlaceholder.style.display = "block";
+                slicerPreviewPlaceholder.innerHTML = `
+                  <div style="cursor: pointer; padding: 14px; text-align: center; color: #38bdf8;">
+                    <div style="font-size: 26px; margin-bottom: 6px;">📂</div>
+                    <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">প্রিভিউ দেখতে ক্লিক করুন</div>
+                    <div style="font-size: 11px; color: #94a3b8;">"${savedPath}" ফোল্ডারের ফাইল ব্রাউজারে লোড করতে এখানে অথবা 'সিলেক্ট' বাটনে চাপুন</div>
+                  </div>
+                `;
+              }
+            }
           }).catch(() => {});
         }
+      }
+
+      if (slicerPreviewPlaceholder) {
+        slicerPreviewPlaceholder.addEventListener("click", () => {
+          if (!slicerPreviewImg || slicerPreviewImg.style.display === "none") {
+            if (selectSlicerInputDirBtn) selectSlicerInputDirBtn.click();
+          }
+        });
       }
 
       // Handle floating menu for cell clicks
