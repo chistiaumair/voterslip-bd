@@ -699,7 +699,19 @@
               <input type="file" id="slicerFolderInput" webkitdirectory directory multiple style="display: none;" />
             </div>
             <div class="size-control" style="width: 100%;">
-              <label>আউটপুট ফোল্ডার (Images):</label>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                <label style="margin: 0;">আউটপুট ফোল্ডার (Images):</label>
+                <div style="display: flex; gap: 8px; font-size: 10px;">
+                  <label style="display: flex; align-items: center; gap: 3px; cursor: pointer; color: #38bdf8;" title="সরাসরি আপনার কম্পিউটারের ফোল্ডারে সেভ হবে (কোনো ZIP হবে না)">
+                    <input type="radio" name="slicerSaveMode" id="slicerSaveModeDirect" value="direct" checked style="cursor: pointer;" />
+                    <span>📂 সরাসরি ফোল্ডারে (No ZIP)</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 3px; cursor: pointer; color: #94a3b8;" title="সকল ছবি একসাথে একটি ZIP ফাইলে ডাউনলোড হবে">
+                    <input type="radio" name="slicerSaveMode" id="slicerSaveModeZip" value="zip" style="cursor: pointer;" />
+                    <span>📦 ZIP ডাউনলোড</span>
+                  </label>
+                </div>
+              </div>
               <div style="display: flex; gap: 5px; margin-top: 4px; width: 100%;">
                 <input type="text" id="slicerOutputDir" placeholder="আউটপুট ফোল্ডার সিলেক্ট বা টাইপ করুন"
                   style="flex: 1; font-size: 11px; background: #111827; border: 1px solid #4b5563; padding: 8px; border-radius: 8px; color: white;" />
@@ -793,9 +805,11 @@
                       style="flex: 1; font-size: 10px; background: #0f172a; border: 1px solid #475569; padding: 6px 8px; border-radius: 6px; color: #f1f5f9; outline: none;" />
                     <button type="button" id="testCloudSlicerBtn"
                       style="padding: 0 10px; font-size: 10px; background: #0ea5e9; color: white; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: bold;">কানেক্ট</button>
+                    <button type="button" id="cloudSlicerGuideBtn" title="কীভাবে Render ক্লাউড পাইথন ফ্রি ডেপ্লয় করবেন"
+                      style="padding: 0 8px; font-size: 10px; background: #334155; color: #38bdf8; border: 1px solid #475569; border-radius: 6px; cursor: pointer; white-space: nowrap; font-weight: bold;">❓ গাইড</button>
                   </div>
                   <div style="font-size: 9.5px; color: #94a3b8; margin-top: 5px; line-height: 1.3;">
-                    * ক্লাউড পাইথন যুক্ত থাকলে PyMuPDF + OpenCV রিয়েল-টাইমে ক্লাউডে চলবে। ফাঁকা রাখলে ১০০% নির্ভুল ব্রাউজার ইঞ্জিন স্লাইস করবে।
+                    * ক্লাউড পাইথন যুক্ত থাকলে PyMuPDF + OpenCV রিয়েল-টাইমে ক্লাউডে চলবে (৮০+ কার্ড/সেকেন্ড)। ফাঁকা রাখলে ব্রাউজার ইঞ্জিন স্লাইস করবে।
                   </div>
                 </div>
               </div>
@@ -1397,6 +1411,59 @@
       <div style="padding: 10px 16px; border-top: 1px solid #334155; background: #0f172a; display: flex; justify-content: flex-end; gap: 8px;">
         <button type="button" id="slicerModalCancelBtn" style="background: #475569; color: white; border: none; border-radius: 6px; padding: 7px 14px; font-size: 11.5px; font-weight: 600; cursor: pointer;">বাতিল</button>
         <button type="button" id="slicerModalConfirmBtn" style="background: #10b981; color: white; border: none; border-radius: 6px; padding: 7px 18px; font-size: 11.5px; font-weight: 700; cursor: pointer;">✅ এই ফোল্ডারটি নিশ্চিত করুন</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Render Cloud Slicer Setup Guide Modal -->
+  <div id="renderGuideModal" style="display: none; position: fixed; inset: 0; z-index: 999999; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); align-items: center; justify-content: center;">
+    <div style="background: #1e293b; border: 1px solid #475569; border-radius: 12px; width: 92%; max-width: 580px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); overflow: hidden; color: #f8fafc;">
+      
+      <!-- Modal Header -->
+      <div style="padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; background: #0f172a;">
+        <h3 style="margin: 0; font-size: 14px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+          <span>🐍</span> Render-এ ফ্রি ক্লাউড পাইথন ইঞ্জিন সেটআপ গাইড
+        </h3>
+        <button type="button" id="closeRenderGuideModalBtn" style="background: transparent; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 2px 6px;">✕</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div style="padding: 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px; font-size: 12px; line-height: 1.6; color: #cbd5e1;">
+        <div style="background: #0f172a; border-left: 4px solid #38bdf8; padding: 10px 12px; border-radius: 4px;">
+          <strong>💡 উদ্দেশ্য:</strong> Firebase Hosting-এর সাথে আপনার GitHub রিপোজিটরির <code>slicer-service</code> ফোল্ডারটি Render.com-এ ২৪/৭ ফ্রি ব্যাকএন্ড হিসেবে চালু করে লোকাল কম্পিউটারের মতো অতি দ্রুত গতিতে (৮০+ কার্ড/সেকেন্ড) স্লাইস করা।
+        </div>
+
+        <div>
+          <div style="font-weight: bold; color: #38bdf8; margin-bottom: 4px;">ধাপ ১: Render.com এ অ্যাকাউন্ট তৈরি / লগইন করুন</div>
+          <div>ব্রাউজারে <a href="https://dashboard.render.com" target="_blank" style="color: #60a5fa; text-decoration: underline;">dashboard.render.com</a> এ গিয়ে আপনার <strong>GitHub</strong> অ্যাকাউন্ট দিয়ে লগইন করুন।</div>
+        </div>
+
+        <div>
+          <div style="font-weight: bold; color: #38bdf8; margin-bottom: 4px;">ধাপ ২: New Web Service তৈরি করুন</div>
+          <div>Dashboard থেকে <strong>+ New</strong> বাটনে ক্লিক করে <strong>Web Service</strong> নির্বাচন করুন। আপনার <code>chistiaumair/voterslip-bd</code> রিপোজিটরিটি সিলেক্ট (Connect) করুন।</div>
+        </div>
+
+        <div>
+          <div style="font-weight: bold; color: #38bdf8; margin-bottom: 4px;">ধাপ ৩: সেটিংস কনফিগার করুন</div>
+          <div style="background: #020617; border: 1px solid #334155; padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 11px;">
+            <div>• Name: <span style="color: #4ade80;">voterslip-cloud-slicer</span></div>
+            <div>• Region: <span style="color: #4ade80;">Singapore</span> (সবচেয়ে দ্রুত)</div>
+            <div>• Runtime: <span style="color: #4ade80;">Docker</span></div>
+            <div>• Dockerfile Path: <span style="color: #4ade80;">./slicer-service/Dockerfile</span></div>
+            <div>• Instance Type: <span style="color: #4ade80;">Free (512 MB)</span></div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-weight: bold; color: #38bdf8; margin-bottom: 4px;">ধাপ ৪: Deploy Web Service এবং লিংক কপি করুন</div>
+          <div>নিচে <strong>Deploy Web Service</strong> এ ক্লিক করুন। ৩-৪ মিনিটের মধ্যে Render আপনার ক্লাউড সার্ভিস তৈরি করে একটি লাইভ লিংক দেবে (যেমন: <code>https://voterslip-cloud-slicer.onrender.com</code>)। সেই লিংকটি এখানে পেস্ট করে <strong>"কানেক্ট"</strong> বাটনে ক্লিক করলেই আপনার web.app আজীবন লোকাল পাইথনের মতো সুপার ফাস্ট চলবে!</div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div style="padding: 10px 16px; border-top: 1px solid #334155; background: #0f172a; display: flex; justify-content: flex-end;">
+        <button type="button" id="renderGuideOkBtn" style="background: #0ea5e9; color: white; border: none; border-radius: 6px; padding: 7px 18px; font-size: 11.5px; font-weight: 700; cursor: pointer;">ঠিক আছে, বুঝেছি</button>
       </div>
 
     </div>
@@ -8880,12 +8947,15 @@
       let isFullSlicing = false;
 
       function getSlicerOptions(previewOnly = false) {
+        const saveModeEl = document.querySelector('input[name="slicerSaveMode"]:checked');
+        const saveMode = saveModeEl ? saveModeEl.value : 'direct';
         return {
           inputDir: slicerInputDirInput.value,
           outputDir: slicerOutputDirInput ? slicerOutputDirInput.value.replace(/^[📁📦]\s*/, '').replace(/\s*\(.*\)$/, '').trim() : "VoterCards",
           cleanup: true,
           hideBorders: slicerHideBordersCheckbox ? slicerHideBordersCheckbox.checked : false,
           previewOnly: previewOnly,
+          saveMode: saveMode,
           padTop: parseInt(slicerPadTopInput?.value) || 0,
           padBottom: parseInt(slicerPadBottomInput?.value) || 0,
           padLeft: parseInt(slicerPadLeftInput?.value) || 0,
@@ -9616,14 +9686,25 @@
       if (testCloudSlicerBtn && cloudSlicerUrlInput) {
         testCloudSlicerBtn.addEventListener("click", async () => {
           const raw = cloudSlicerUrlInput.value.trim().replace(/\/+$/, '');
+          if (!raw) {
+            alert("⚠️ অনুগ্রহ করে Render-এ আপনার ডেপ্লয় করা সার্ভিসের সঠিক URL দিন (যেমন: https://your-service.onrender.com)।\n\nফ্রি ক্লাউড পাইথন কীভাবে ডেপ্লয় করবেন তা জানতে পাশের '❓ গাইড' বাটনে ক্লিক করুন।");
+            return;
+          }
           localStorage.setItem('voterslip_cloud_slicer_url', raw);
-          cloudSlicerStatusBadge.textContent = "কানেক্ট হচ্ছে...";
+          cloudSlicerStatusBadge.textContent = "সার্ভার কানেক্ট হচ্ছে...";
           cloudSlicerStatusBadge.style.color = "#38bdf8";
+
+          // AbortController with 45s cold start timer (matching smart-mohuri architecture)
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 45000);
+          const coldStartTimer = setTimeout(() => {
+            cloudSlicerStatusBadge.textContent = "💤 কোল্ড স্টার্ট (জাগছে)...";
+          }, 3500);
+
           try {
-            const controller = new AbortController();
-            const tid = setTimeout(() => controller.abort(), 15000);
             const res = await fetch(`${raw}/api/check-backend-slicer`, { signal: controller.signal });
             clearTimeout(tid);
+            clearTimeout(coldStartTimer);
             if (res.ok) {
               const d = await res.json();
               if (d && d.available) {
@@ -9634,13 +9715,33 @@
                 return;
               }
             }
+            throw new Error("Invalid response");
           } catch (e) {
+            clearTimeout(tid);
+            clearTimeout(coldStartTimer);
             cloudSlicerStatusBadge.textContent = "❌ কানেক্ট হয়নি";
             cloudSlicerStatusBadge.style.color = "#f87171";
-            alert("ক্লাউড সার্ভারের সাথে কানেক্ট করা যায়নি। URL ঠিক আছে কিনা এবং Render সার্ভিস রানিং আছে কিনা চেক করুন।");
+            alert(`❌ ক্লাউড সার্ভারের সাথে কানেক্ট করা যায়নি (${raw})\n\nসম্ভাব্য কারণ:\n১. এই URL-এ এখনও Render সার্ভিস তৈরি করা হয়নি (পাশের '❓ গাইড' বাটনে দেখুন)।\n২. Render ফ্রি সার্ভার স্লিপ মোডে থাকলে জেগে উঠতে ১৫-২৫ সেকেন্ড সময় নেয়।`);
           }
         });
       }
+
+      // Render Setup Guide Modal Trigger
+      const cloudSlicerGuideBtn = document.getElementById("cloudSlicerGuideBtn");
+      const renderGuideModal = document.getElementById("renderGuideModal");
+      const closeRenderGuideModalBtn = document.getElementById("closeRenderGuideModalBtn");
+      const renderGuideOkBtn = document.getElementById("renderGuideOkBtn");
+
+      function openRenderGuideModal() {
+        if (renderGuideModal) renderGuideModal.style.display = "flex";
+      }
+      function closeRenderGuideModal() {
+        if (renderGuideModal) renderGuideModal.style.display = "none";
+      }
+      if (cloudSlicerGuideBtn) cloudSlicerGuideBtn.addEventListener("click", openRenderGuideModal);
+      if (closeRenderGuideModalBtn) closeRenderGuideModalBtn.addEventListener("click", closeRenderGuideModal);
+      if (renderGuideOkBtn) renderGuideOkBtn.addEventListener("click", closeRenderGuideModal);
+
       setTimeout(updateCloudSlicerStatus, 1000);
 
       function updatePreviewImage() {
@@ -9685,7 +9786,7 @@
 
       // Click Slicer Run Button
       if (runSlicerBtn) {
-        runSlicerBtn.addEventListener("click", () => {
+        runSlicerBtn.addEventListener("click", async () => {
           if (isSlicing) return;
           const options = getSlicerOptions(false);
           if (!options.inputDir) {
@@ -9693,6 +9794,26 @@
             else alert("অনুগ্রহ করে ইনপুট ফোল্ডার সিলেক্ট করুন।");
             return;
           }
+
+          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          const isDirectMode = options.saveMode === 'direct';
+
+          // On Web Browser: if direct mode is active and user hasn't chosen folder handle yet, prompt folder picker
+          if (!isLocal && isDirectMode && !window.__slicerOutputDirHandle && 'showDirectoryPicker' in window) {
+            try {
+              const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+              if (handle) {
+                window.__slicerOutputDirHandle = handle;
+                if (slicerOutputDirInput) slicerOutputDirInput.value = `📁 ${handle.name}`;
+                localStorage.setItem("slicerOutputDir", handle.name);
+                options.outputDirHandle = handle;
+              }
+            } catch (err) {
+              if (err.name === 'AbortError') return; // User cancelled folder picker
+              console.warn("showDirectoryPicker failed:", err);
+            }
+          }
+
           let currentOutDir = (options.outputDir || (slicerOutputDirInput ? slicerOutputDirInput.value.trim() : ""));
           if (!currentOutDir && !window.__slicerOutputDirHandle) {
             currentOutDir = "VoterCards";

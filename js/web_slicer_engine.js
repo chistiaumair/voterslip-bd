@@ -187,7 +187,7 @@
       for (let c = 0; c < width; c++) {
         const idx = rowOffset + (startX + c) * 4;
         const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-        if (lum < 180) rDark++;
+        if (lum < 185) rDark++;
       }
       if (rDark > width * 0.35) {
         isTopBorderRow[r] = true;
@@ -204,18 +204,18 @@
         if (row < 5 && isTopBorderRow[row]) continue; // Ignore residual top border line ONLY
         const idx = ((startY + row) * pW + colX) * 4;
         const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-        if (lum < 180) {
+        if (lum < 195) { // Sensitive to antialiased font pixels
           darkCount++;
         }
       }
       totalDark += darkCount;
-      if (darkCount >= 3 && maxCol === 0) { // Require >= 3 dark pixels
+      if (darkCount >= 2 && maxCol === 0) { // Require >= 2 dark pixels
         maxCol = col;
       }
     }
 
-    // Discard if completely blank or too few dark pixels (<60)
-    if (maxCol === 0 || totalDark < 60) {
+    // Discard only if completely blank with virtually no ink
+    if (totalDark < 15) {
       return null;
     }
 
@@ -224,7 +224,15 @@
     // target_w = max(min_w, min(cropped_hide.shape[1], max_col + 22))
     const resolutionScale = (srcCanvas.width / 842.0) || 2.0;
     const minWidth = Math.round(250 * (resolutionScale / 2.0));
-    const trimmedWidth = Math.max(minWidth, Math.min(width, maxCol + padRight));
+    let trimmedWidth = (maxCol > 0)
+      ? Math.max(minWidth, Math.min(width, maxCol + padRight))
+      : minWidth;
+
+    // For 2-line mode ("ক্রমিক, নাম, ভোটার নং"), clamp to standard width so preview is never 450px
+    if (is2LineMode) {
+      trimmedWidth = Math.min(trimmedWidth, Math.round(350 * (resolutionScale / 2.0)));
+      if (maxCol === 0 || trimmedWidth < minWidth) trimmedWidth = minWidth;
+    }
 
     // Smart Bottom Trim: Prune any Line 3 Father's name kar signs if present (matching pdf_slice.py line 290)
     let finalH = height;
@@ -235,7 +243,7 @@
         for (let c = 0; c < trimmedWidth; c++) {
           const idx = rowOffset + (startX + c) * 4;
           const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-          if (lum < 180) rowCounts[r]++;
+          if (lum < 195) rowCounts[r]++;
         }
       }
       for (let r = finalH - 2; r >= Math.max(0, finalH - 6); r--) {
@@ -436,6 +444,8 @@
         let unhideDataUrl = "";
         let hideDataUrl = "";
 
+        const minPreviewW = Math.round(250 * (resolutionScale / 2.0));
+
         for (let box of boxes) {
           const startY = Math.max(0, box.y + shaveTop + padTop);
           const rawCropH = Math.round(box.h * lineRatio);
@@ -446,11 +456,15 @@
           const targetW = Math.max(30, rawCropW - (shaveLeft + padLeft));
 
           const trimmed = autoTrimRightWhitespace(pageCanvas, startX, startY, targetW, targetH, 22, lines === 2);
-          if (trimmed) {
+          if (trimmed && trimmed.dataUrl) {
             selectedBox = box;
             hideDataUrl = trimmed.dataUrl;
             break;
           }
+        }
+
+        if (!selectedBox && boxes.length > 0) {
+          selectedBox = boxes[0];
         }
 
         if (selectedBox) {
@@ -460,41 +474,41 @@
           const uCtx = uCanvas.getContext('2d');
           uCtx.drawImage(pageCanvas, selectedBox.x, selectedBox.y, selectedBox.w, selectedBox.h, 0, 0, selectedBox.w, selectedBox.h);
           unhideDataUrl = uCanvas.toDataURL('image/jpeg', 0.85);
-        } else if (boxes.length > 0) {
-          // Direct fallback to first detected box
-          selectedBox = boxes[0];
-          const uCanvas = document.createElement('canvas');
-          uCanvas.width = selectedBox.w;
-          uCanvas.height = selectedBox.h;
-          const uCtx = uCanvas.getContext('2d');
-          uCtx.drawImage(pageCanvas, selectedBox.x, selectedBox.y, selectedBox.w, selectedBox.h, 0, 0, selectedBox.w, selectedBox.h);
-          unhideDataUrl = uCanvas.toDataURL('image/jpeg', 0.85);
 
-          const startY = Math.max(0, selectedBox.y + shaveTop + padTop);
-          const rawCropH = Math.round(selectedBox.h * lineRatio);
-          const targetH = Math.max(15, rawCropH - padBottom);
+          if (!hideDataUrl) {
+            const startY = Math.max(0, selectedBox.y + shaveTop + padTop);
+            const rawCropH = Math.round(selectedBox.h * lineRatio);
+            const targetH = Math.max(15, rawCropH - padBottom);
 
-          const startX = Math.max(0, selectedBox.x + shaveLeft + padLeft);
-          const rawCropW = selectedBox.w - 15 - padRight;
-          const targetW = Math.max(30, rawCropW - (shaveLeft + padLeft));
+            const startX = Math.max(0, selectedBox.x + shaveLeft + padLeft);
+            const rawCropW = selectedBox.w - 15 - padRight;
+            const targetW = Math.max(30, rawCropW - (shaveLeft + padLeft));
 
-          const hCanvas = document.createElement('canvas');
-          hCanvas.width = targetW;
-          hCanvas.height = targetH;
-          const hCtx = hCanvas.getContext('2d');
-          hCtx.drawImage(pageCanvas, startX, startY, targetW, targetH, 0, 0, targetW, targetH);
-          hideDataUrl = hCanvas.toDataURL('image/jpeg', 0.85);
+            const trimmed = autoTrimRightWhitespace(pageCanvas, startX, startY, targetW, targetH, 22, lines === 2);
+            if (trimmed && trimmed.dataUrl) {
+              hideDataUrl = trimmed.dataUrl;
+            } else {
+              // Guaranteed clamp to minPreviewW (250 px @ 2.0x, height 39 px) matching python pdf_slice.py line 285
+              const clampW = Math.min(minPreviewW, targetW);
+              const hCanvas = document.createElement('canvas');
+              hCanvas.width = clampW;
+              hCanvas.height = targetH;
+              const hCtx = hCanvas.getContext('2d');
+              hCtx.drawImage(pageCanvas, startX, startY, clampW, targetH, 0, 0, clampW, targetH);
+              hideDataUrl = hCanvas.toDataURL('image/jpeg', 0.85);
+            }
+          }
         } else {
           // Proportional fallback from page
-          const fbW = Math.round(pageCanvas.width * 0.35);
-          const fbH = Math.round(pageCanvas.height * 0.15);
-          const fbX = Math.round(pageCanvas.width * 0.08);
-          const fbY = Math.round(pageCanvas.height * 0.18);
+          const fbW = minPreviewW;
+          const fbH = Math.max(15, Math.round(39 * (resolutionScale / 2.0)));
           const fbCanvas = document.createElement('canvas');
           fbCanvas.width = fbW;
           fbCanvas.height = fbH;
           const fbCtx = fbCanvas.getContext('2d');
-          fbCtx.drawImage(pageCanvas, fbX, fbY, fbW, fbH, 0, 0, fbW, fbH);
+          fbCtx.fillStyle = '#ffffff';
+          fbCtx.fillRect(0, 0, fbW, fbH);
+          fbCtx.drawImage(pageCanvas, 0, 0, fbW, fbH, 0, 0, fbW, fbH);
           unhideDataUrl = fbCanvas.toDataURL('image/jpeg', 0.85);
           hideDataUrl = unhideDataUrl;
         }
@@ -547,18 +561,18 @@
       pageCanvas.width = viewport.width;
       pageCanvas.height = viewport.height;
 
-      // Render PDF page to canvas
+      // Render PDF page to canvas with print intent for maximum performance
       await page.render({
         canvasContext: pageCtx,
-        viewport: viewport
+        viewport: viewport,
+        intent: 'print'
       }).promise;
 
-      // Get page text to detect cancelled cards and page metadata
+      // Get page text to detect cancelled cards and page metadata (fast slice of header items)
       const textContent = await page.getTextContent();
-      const pageText = textContent.items.map(i => fixBengaliGlyphs(i.str)).join(' ');
+      const pageHeader = (textContent.items || []).slice(0, 40).map(i => fixBengaliGlyphs(i.str)).join(' ');
 
       // Skip page if header indicates cancelled/migrated voter section (matching pdf_slice.py)
-      const pageHeader = pageText.slice(0, 300);
       if (["কর্তন", "কৰ্ত্তন", "মাইগ্রেশন", "স্থানান্তর", "বাতিল", "KvZv", "gBRÖkb"].some(kw => pageHeader.includes(kw))) {
         if (onLog) onLog(`পৃষ্ঠা ${pageNum}: কর্তন/মাইগ্রেশন সেকশন স্কিপ করা হয়েছে।\n`);
         continue;
@@ -617,17 +631,13 @@
 
         if (subDirHandle) {
           try {
-            const fileHandle = await subDirHandle.getFileHandle(cardFilename, { create: true });
-            const writable = await fileHandle.createWritable();
-            const commaIdx = trimmed.dataUrl.indexOf(',');
-            const byteCharacters = atob(trimmed.dataUrl.substring(commaIdx + 1));
-            const byteArray = new Uint8Array(byteCharacters.length);
-            for (let b = 0; b < byteCharacters.length; b++) {
-              byteArray[b] = byteCharacters.charCodeAt(b);
+            const blob = await new Promise(res => sharedTrimCanvas.toBlob(res, 'image/jpeg', 0.85));
+            if (blob) {
+              const fileHandle = await subDirHandle.getFileHandle(cardFilename, { create: true });
+              const writable = await fileHandle.createWritable();
+              await writable.write(blob);
+              await writable.close();
             }
-            const blob = new Blob([byteArray], { type: 'image/jpeg' });
-            await writable.write(blob);
-            await writable.close();
           } catch (writeErr) {
             console.error("Failed to write card to disk:", cardFilename, writeErr);
           }
@@ -641,11 +651,13 @@
           });
         }
 
+        // Only store full dataUrl if ZIP fallback is needed (avoids browser out-of-memory stalls)
+        const needsZipStorage = (!subDirHandle && options.saveMode !== 'direct') || options.saveMode === 'zip';
         slicedCards.push({
           name: cardFilename,
           pageNum: pageNum,
           cardIndex: cardIndex,
-          dataUrl: trimmed.dataUrl,
+          dataUrl: needsZipStorage ? trimmed.dataUrl : null,
           subFolderName: subFolderName
         });
 
