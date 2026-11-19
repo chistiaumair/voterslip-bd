@@ -1,0 +1,59 @@
+{
+  "name": "voter-slip-generator",
+  "version": "1.0.0",
+  "description": "Voter Slip PDF Generator Desktop App",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "web": "npx http-server -p 3000 -o",
+    "serve": "npx http-server -p 3000 -o",
+    "build": "set NODE_OPTIONS=--max-old-space-size=8192 && electron-builder --win --x64"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.voterslip.generator",
+    "productName": "Voter Slip Generator",
+    "directories": {
+      "output": "dist"
+    },
+    "asarUnpack": [
+      "bin/**/*"
+    ],
+    "win": {
+      "icon": "icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Voter Slip Generator",
+      "deleteAppDataOnUninstall": true
+    },
+    "files": [
+      "index.html",
+      "css/**/*",
+      "js/**/*",
+      "NotoSansBengali-Regular.ttf",
+      "main.js",
+      "preload.js",
+      "icon.png",
+      "bin/**/*"
+    ]
+  }
+}

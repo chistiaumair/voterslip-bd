@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="bn">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voter Slip Generator - Key Generator</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      padding: 30px;
+      border-radius: 16px;
+      width: 520px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    h2 {
+      text-align: center;
+      color: #38bdf8;
+      margin-bottom: 20px;
+      margin-top: 0;
+      font-size: 24px;
+    }
+
+    label {
+      font-size: 13px;
+      color: #94a3b8;
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #f1f5f9;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      box-sizing: border-box;
+      margin-bottom: 15px;
+      transition: border-color 0.2s;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: #38bdf8;
+      outline: none;
+    }
+
+    textarea {
+      font-family: inherit;
+      resize: vertical;
+      height: 80px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 15px;
+    }
+
+    .input-col {
+      flex: 1;
+    }
+
+    button {
+      width: 100%;
+      background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+      transition: opacity 0.2s;
+      margin-bottom: 10px;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .result {
+      margin-top: 20px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px dashed #38bdf8;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+      display: none;
+    }
+
+    .result-key {
+      font-family: monospace;
+      font-size: 20px;
+      font-weight: bold;
+      color: #38bdf8;
+      margin-top: 5px;
+      letter-spacing: 0.05em;
+      user-select: all;
+      background: #0f172a;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #1e293b;
+    }
+
+    .status-msg {
+      font-size: 12px;
+      color: #10b981;
+      margin-top: 8px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h2>License Key Generator & Logger</h2>
+
+    <!-- Step 1: Paste client details -->
+    <label for="pasteArea">১. হোয়াটসঅ্যাপ থেকে কপি করা মেসেজ এখানে পেস্ট করুন (Auto-Parse):</label>
+    <textarea id="pasteArea" placeholder="এখানে পেস্ট করুন..." oninput="autoParse()"></textarea>
+
+    <!-- Step 2: Extracted fields -->
+    <div class="input-row">
+      <div class="input-col">
+        <label for="clientName">কাস্টমারের নাম (Name):</label>
+        <input type="text" id="clientName" placeholder="রহিম আহমেদ" />
+      </div>
+      <div class="input-col">
+        <label for="clientMobile">মোবাইল নাম্বার (Mobile):</label>
+        <input type="text" id="clientMobile" placeholder="017XXXXXXXX" />
+      </div>
+    </div>
+
+    <label for="machineId">Machine ID (মেশিন আইডি):</label>
+    <input type="text" id="machineId" placeholder="XXXX-XXXX-XXXX-XXXX" style="font-family: monospace;" />
+
+    <!-- Step 3: Google Sheets Web App URL -->
+    <label for="sheetUrl">Google Apps Script Web App URL (লোকাল সেভ থাকবে):</label>
+    <input type="text" id="sheetUrl"
+      value="https://script.google.com/macros/s/AKfycbwTT0HRvYKKpq6Bi8R1YasfFYso_qIhaebyvQXeZ_vLjGfhTcAzcpInxWSdfH2zyKvEAw/exec"
+      onchange="saveSheetUrl()" />
+
+    <!-- Action Button -->
+    <button onclick="generateAndSave()">Generate Key & Save to Sheets</button>
+
+    <!-- Result Display -->
+    <div id="resultBox" class="result">
+      <label>License Key (কপি করে কাস্টমারকে পাঠান):</label>
+      <div id="licenseKey" class="result-key">LIC-XXXX-XXXX-XXXX-XXXX</div>
+      <div id="statusMessage" class="status-msg"></div>
+    </div>
+  </div>
+
+  <script>
+    // Load saved Google Sheet URL on load (force update if old/empty)
+    window.onload = function() {
+      const defaultUrl = "https://script.google.com/macros/s/AKfycbyIY3H1HRfrs2imn5T3HI9yQegiiBHWs4sW-EwjbqW7ogvnqBeA6rzlODs4TpONJd5h9w/exec";
+      const savedUrl = localStorage.getItem("googleSheetUrl");
+      
+      if (!savedUrl || savedUrl.indexOf("AKfycbyIY3H1HRfrs2imn5T3HI9yQegiiBHWs4sW-EwjbqW7ogvnqBeA6rzlODs4TpONJd5h9w") === -1) {
+        localStorage.setItem("googleSheetUrl", defaultUrl);
+        document.getElementById("sheetUrl").value = defaultUrl;
+      } else {
+        document.getElementById("sheetUrl").value = savedUrl;
+      }
+    };
+
+    function saveSheetUrl() {
+      const url = document.getElementById("sheetUrl").value.trim();
+      localStorage.setItem("googleSheetUrl", url);
+    }
+
+    // Auto parse pasted text from WhatsApp
+    function autoParse() {
+      const pasteText = document.getElementById("pasteArea").value;
+
+      // Matches both English and Bengali texts
+      const nameMatch = pasteText.match(/(?:নাম|Name)\s*:\s*(.+)/i);
+      const mobileMatch = pasteText.match(/(?:মোবাইল|Mobile|Phone|ফোন)\s*:\s*(.+)/i);
+      const machineMatch = pasteText.match(/(?:Machine ID|মেশিন আইডি)\s*:\s*([A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4})/i);
+
+      if (nameMatch) {
+        document.getElementById("clientName").value = nameMatch[1].trim();
+      }
+      if (mobileMatch) {
+        document.getElementById("clientMobile").value = mobileMatch[1].trim();
+      }
+      if (machineMatch) {
+        document.getElementById("machineId").value = machineMatch[1].trim().toUpperCase();
+      }
+    }
+
+    async function sha256(message) {
+      const msgBuffer = new TextEncoder().encode(message);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      return hashHex.toUpperCase();
+    }
+
+    async function generateAndSave() {
+      const name = document.getElementById('clientName').value.trim();
+      const mobile = document.getElementById('clientMobile').value.trim();
+      const machineId = document.getElementById('machineId').value.trim();
+      const sheetUrl = document.getElementById('sheetUrl').value.trim();
+
+      const resultBox = document.getElementById('resultBox');
+      const licenseKeyDiv = document.getElementById('licenseKey');
+      const statusMessage = document.getElementById('statusMessage');
+
+      if (!machineId) {
+        alert('Please enter or parse a Machine ID!');
+        return;
+      }
+
+      // Calculate License Key
+      const secret = 'VOTER_SLIP_SECRET_SALT_2026';
+      const hash = await sha256(machineId + secret);
+      const formattedKey = `LIC-${hash.substring(0, 4)}-${hash.substring(4, 8)}-${hash.substring(8, 12)}-${hash.substring(12, 16)}`;
+
+      licenseKeyDiv.textContent = formattedKey;
+      resultBox.style.display = 'block';
+
+      // Copy key to clipboard automatically
+      navigator.clipboard.writeText(formattedKey);
+      statusMessage.textContent = "✔ License key generated & copied to clipboard!";
+
+      // Send to Google Sheet if Web App URL is provided
+      if (sheetUrl) {
+        statusMessage.textContent = "Saving to Google Sheets...";
+        const finalUrl = `${sheetUrl}?name=${encodeURIComponent(name)}&mobile=${encodeURIComponent(mobile)}&machineId=${encodeURIComponent(machineId)}&licenseKey=${encodeURIComponent(formattedKey)}`;
+
+        try {
+          // Remove old iframe if it exists
+          const oldIframe = document.getElementById("temp-gas-iframe");
+          if (oldIframe) oldIframe.remove();
+
+          // Create a new hidden iframe to perform the GET request securely from local file://
+          const iframe = document.createElement("iframe");
+          iframe.id = "temp-gas-iframe";
+          iframe.style.display = "none";
+          iframe.src = finalUrl;
+          document.body.appendChild(iframe);
+
+          statusMessage.textContent = "✔ License key copied and saved to Google Sheets!";
+          statusMessage.style.color = "#10b981";
+        } catch (e) {
+          statusMessage.textContent = "⚠ Key copied, but failed to save to Google Sheets. Check your URL.";
+          statusMessage.style.color = "#ef4444";
+        }
+      } else {
+        statusMessage.textContent = "✔ License key copied! (Google Sheets URL is missing - not logged)";
+        statusMessage.style.color = "#eab308";
+      }
+    }
+  </script>
+</body>
+
+</html>

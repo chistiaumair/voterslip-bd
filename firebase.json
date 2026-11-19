@@ -1,0 +1,37 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "bin/**",
+      "votcenter/**",
+      "dist/**",
+      "App_Update_Package/**",
+      "pdf_generate/**",
+      "scratch/**",
+      "test_temp_preview/**",
+      "**/__pycache__/**",
+      "*.bat",
+      "*.py",
+      "*.docx",
+      "*.csv",
+      "main.js",
+      "preload.js",
+      "check_slicer.js",
+      "web_server.js",
+      "admin_synced_data.json",
+      "key_generator.html",
+      "package*.json"
+    ],
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

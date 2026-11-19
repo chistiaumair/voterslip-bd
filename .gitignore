@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Electron & Desktop Build Artifacts (Heavy binaries > 1 GB)
+dist/
+App_Update_Package/
+bin/
+
+# Python Cache & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+.Python
+env/
+venv/
+votcenter/__pycache__/
+
+# Scratch & Temporary Testing Folders
+scratch/
+test_temp_preview/
+pdf_generate/
+check_slicer.js
+
+# Local Environment & Logs
+*.log
+.firebase/
+admin_synced_data.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+.env.local
+
+# OS Generated Files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
