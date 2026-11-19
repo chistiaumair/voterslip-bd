@@ -1292,6 +1292,17 @@
         const allJobs = [];
         let totalAllCards = 0;
 
+        if (outputDirHandle && typeof outputDirHandle.requestPermission === 'function') {
+          try {
+            const q = await outputDirHandle.queryPermission({ mode: 'readwrite' });
+            if (q !== 'granted') {
+              await outputDirHandle.requestPermission({ mode: 'readwrite' });
+            }
+          } catch (pe) {
+            console.warn("Could not elevate outputDirHandle to readwrite:", pe);
+          }
+        }
+
         for (let fileIdx = 0; fileIdx < totalPdfs; fileIdx++) {
           const f = files[fileIdx];
           const codeMatch = f.name.match(/\b\d{6}\b/) || f.name.match(/\d{6}/);
