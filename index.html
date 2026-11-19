@@ -1461,7 +1461,7 @@
 
   <script src="./js/jspdf.umd.min.js"></script>
   <script src="./js/pdf.min.js"></script>
-  <script src="./js/web_slicer_engine.js?v=20261119_v5"></script>
+  <script src="./js/web_slicer_engine.js?v=20261119_v6"></script>
   <script src="./js/voter_slip_template.js"></script>
   <script src="./js/home_page.js"></script>
   <script src="./js/token_system.js"></script>
@@ -9541,10 +9541,22 @@
             return;
           }
 
-          // Modern Web Browser Mode: showDirectoryPicker
+          // If on localhost with web_server.js:
+          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          if (isLocal) {
+            try {
+              const res = await fetch('/api/quick-folders').catch(() => null);
+              if (res && res.ok) {
+                openFolderSelectorModal('output');
+                return;
+              }
+            } catch (e) {}
+          }
+
+          // Modern Web Browser Mode: showDirectoryPicker with readwrite mode
           if ('showDirectoryPicker' in window) {
             try {
-              const dirHandle = await window.showDirectoryPicker();
+              const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'desktop' });
               if (dirHandle) {
                 window.__slicerOutputDirHandle = dirHandle;
                 slicerOutputDirInput.value = dirHandle.name;
@@ -9553,15 +9565,19 @@
               }
             } catch (err) {
               if (err.name === 'AbortError') return; // User cancelled
-              console.warn("showDirectoryPicker failed, falling back to input element:", err);
+              if (err.name === 'SecurityError') {
+                alert("⚠️ ব্রাউজার নিরাপত্তার কারণে সরাসরি মূল Desktop বা C:\\ রুট ফোল্ডার নির্বাচন করা যায় না।\n\nঅনুগ্রহ করে ডেস্কটপের ভেতরে থাকা কোনো ফোল্ডার (যেমন: slice) নির্বাচন করুন অথবা নতুন ফোল্ডার তৈরি করে সিলেক্ট করুন।");
+                return;
+              }
+              console.warn("showDirectoryPicker failed:", err);
             }
           }
 
-          // Fallback across all browsers:
-          const op = document.getElementById("slicerOutputDirPicker");
-          if (op) {
-            op.value = "";
-            op.click();
+          // Fallback across all browsers (prompts for folder name ensuring the field is updated):
+          const manualFolder = prompt("আউটপুট ফোল্ডারের নাম দিন (যেমন: slice বা VoterCards):", slicerOutputDirInput.value || "slice");
+          if (manualFolder && manualFolder.trim()) {
+            slicerOutputDirInput.value = manualFolder.trim();
+            localStorage.setItem("slicerOutputDir", manualFolder.trim());
           }
         });
       }
@@ -9570,8 +9586,11 @@
       if (slicerOutputDirPicker) {
         slicerOutputDirPicker.addEventListener("change", (e) => {
           const files = Array.from(e.target.files || []);
+          let folderName = "";
           if (files.length > 0 && files[0].webkitRelativePath) {
-            const folderName = files[0].webkitRelativePath.split('/')[0];
+            folderName = files[0].webkitRelativePath.split('/')[0];
+          }
+          if (folderName) {
             slicerOutputDirInput.value = folderName;
             localStorage.setItem("slicerOutputDir", folderName);
           }
@@ -9818,7 +9837,7 @@
 
       // Click Slicer Run Button
       if (runSlicerBtn) {
-        runSlicerBtn.addEventListener("click", () => {
+        runSlicerBtn.addEventListener("click", async () => {
           if (isSlicing) return;
           const options = getSlicerOptions(false);
           const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -9828,6 +9847,26 @@
             if (selectSlicerInputDirBtn) selectSlicerInputDirBtn.click();
             else alert("অনুগ্রহ করে ইনপুট ফোল্ডার বা PDF সিলেক্ট করুন।");
             return;
+          }
+
+          // In Web mode (web.app): if user hasn't selected an output folder handle yet,
+          // open folder picker so files save directly to disk without any ZIP download or save-as prompt!
+          if (!isLocal && !window.__slicerOutputDirHandle && 'showDirectoryPicker' in window) {
+            try {
+              const handle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'desktop' });
+              if (handle) {
+                window.__slicerOutputDirHandle = handle;
+                slicerOutputDirInput.value = handle.name;
+                localStorage.setItem("slicerOutputDir", handle.name);
+                options.outputDirHandle = handle;
+              }
+            } catch (err) {
+              if (err.name === 'AbortError') return; // User cancelled
+              if (err.name === 'SecurityError') {
+                alert("⚠️ ব্রাউজার নিরাপত্তার কারণে সরাসরি মূল Desktop বা C:\\ রুট ফোল্ডার নির্বাচন করা যায় না।\n\nঅনুগ্রহ করে ডেস্কটপের ভেতরে থাকা কোনো ফোল্ডার (যেমন: slice) নির্বাচন করুন।");
+                return;
+              }
+            }
           }
 
           if (window.__slicerOutputDirHandle) {
