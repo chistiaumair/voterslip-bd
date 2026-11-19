@@ -1461,7 +1461,7 @@
 
   <script src="./js/jspdf.umd.min.js"></script>
   <script src="./js/pdf.min.js"></script>
-  <script src="./js/web_slicer_engine.js?v=20261119_v7"></script>
+  <script src="./js/web_slicer_engine.js?v=20261119_v9"></script>
   <script src="./js/voter_slip_template.js"></script>
   <script src="./js/home_page.js"></script>
   <script src="./js/token_system.js"></script>
@@ -8939,7 +8939,7 @@
       function getSlicerOptions(previewOnly = false) {
         return {
           inputDir: slicerInputDirInput.value,
-          outputDir: slicerOutputDirInput ? slicerOutputDirInput.value.replace(/^[📁📦]\s*/, '').replace(/\s*\(.*\)$/, '').trim() : "VoterCards",
+          outputDir: slicerOutputDirInput ? slicerOutputDirInput.value.replace(/^[📁📦]\s*/, '').replace(/\s*\(.*\)$/, '').trim() : "",
           cleanup: true,
           hideBorders: slicerHideBordersCheckbox ? slicerHideBordersCheckbox.checked : false,
           previewOnly: previewOnly,
@@ -9545,7 +9545,7 @@
           // Open native OS folder picker dialog directly!
           if ('showDirectoryPicker' in window) {
             try {
-              const dirHandle = await window.showDirectoryPicker();
+              const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
               if (dirHandle) {
                 window.__slicerOutputDirHandle = dirHandle;
                 slicerOutputDirInput.value = dirHandle.name;
@@ -9554,15 +9554,14 @@
               }
             } catch (err) {
               if (err.name === 'AbortError') return; // User cancelled
-              console.warn("showDirectoryPicker failed, falling back to prompt:", err);
+              console.warn("showDirectoryPicker failed, falling back to input picker:", err);
             }
           }
 
-          // Fallback across all browsers (prompts for folder name ensuring the field is updated):
-          const manualFolder = prompt("আউটপুট ফোল্ডারের নাম দিন (যেমন: slice বা VoterCards):", slicerOutputDirInput.value || "slice");
-          if (manualFolder && manualFolder.trim()) {
-            slicerOutputDirInput.value = manualFolder.trim();
-            localStorage.setItem("slicerOutputDir", manualFolder.trim());
+          const picker = document.getElementById("slicerOutputDirPicker");
+          if (picker) {
+            picker.value = "";
+            picker.click();
           }
         });
       }
@@ -9839,9 +9838,11 @@
           }
 
           let currentOutDir = (options.outputDir || (slicerOutputDirInput ? slicerOutputDirInput.value.trim() : ""));
-          if (!currentOutDir && !window.__slicerOutputDirHandle) {
-            currentOutDir = "VoterCards";
-            options.outputDir = "VoterCards";
+          if (!currentOutDir && !window.__slicerOutputDirHandle && !isLocal) {
+            if (selectSlicerOutputDirBtn) {
+              selectSlicerOutputDirBtn.click();
+              return;
+            }
           }
 
           const openOutBtn = document.getElementById("openSlicerOutputDirBtn");

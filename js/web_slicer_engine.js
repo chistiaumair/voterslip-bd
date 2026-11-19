@@ -663,13 +663,10 @@
           });
         }
 
-        // Only store full dataUrl if ZIP fallback is needed (avoids browser out-of-memory stalls)
-        const needsZipStorage = (!subDirHandle && options.saveMode !== 'direct') || options.saveMode === 'zip';
         slicedCards.push({
           name: cardFilename,
           pageNum: pageNum,
           cardIndex: cardIndex,
-          dataUrl: needsZipStorage ? trimmed.dataUrl : null,
           subFolderName: subFolderName
         });
 
@@ -898,84 +895,6 @@
       }
     }
     return voters;
-  }
-
-  // 9. Pure JavaScript Store ZIP Generator for Web Batch Downloads
-  function createZipBlob(files) {
-    const crcTable = new Uint32Array(256);
-    for (let i = 0; i < 256; i++) {
-      let c = i;
-      for (let j = 0; j < 8; j++) {
-        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-      }
-      crcTable[i] = c >>> 0;
-    }
-    function calcCrc(buf) {
-      let crc = 0xFFFFFFFF;
-      for (let i = 0; i < buf.length; i++) {
-        crc = (crc >>> 8) ^ crcTable[(crc ^ buf[i]) & 0xFF];
-      }
-      return (crc ^ 0xFFFFFFFF) >>> 0;
-    }
-
-    const parts = [];
-    const cdEntries = [];
-    let offset = 0;
-    const encoder = new TextEncoder();
-
-    for (const f of files) {
-      const nameBytes = encoder.encode(f.name);
-      const dataBytes = f.data;
-      const crc = calcCrc(dataBytes);
-      const size = dataBytes.length;
-
-      // Local Header (30 bytes)
-      const lh = new Uint8Array(30);
-      const dv = new DataView(lh.buffer);
-      dv.setUint32(0, 0x04034b50, true);
-      dv.setUint16(4, 20, true);
-      dv.setUint16(6, 0x0800, true); // UTF-8
-      dv.setUint16(8, 0, true);      // Store (compression 0)
-      dv.setUint32(14, crc, true);
-      dv.setUint32(18, size, true);
-      dv.setUint32(22, size, true);
-      dv.setUint16(26, nameBytes.length, true);
-      dv.setUint16(28, 0, true);
-
-      parts.push(lh, nameBytes, dataBytes);
-
-      // Central Directory Entry (46 bytes)
-      const cd = new Uint8Array(46);
-      const cdv = new DataView(cd.buffer);
-      cdv.setUint32(0, 0x02014b50, true);
-      cdv.setUint16(4, 20, true);
-      cdv.setUint16(6, 20, true);
-      cdv.setUint16(8, 0x0800, true); // UTF-8
-      cdv.setUint16(10, 0, true);     // Store
-      cdv.setUint32(16, crc, true);
-      cdv.setUint32(20, size, true);
-      cdv.setUint32(24, size, true);
-      cdv.setUint16(28, nameBytes.length, true);
-      cdv.setUint32(42, offset, true);
-
-      cdEntries.push(cd, nameBytes);
-      offset += 30 + nameBytes.length + size;
-    }
-
-    const cdOffset = offset;
-    let cdSize = 0;
-    for (const p of cdEntries) cdSize += p.length;
-
-    // End of Central Directory (22 bytes)
-    const eocd = new Uint8Array(22);
-    const edv = new DataView(eocd.buffer);
-    edv.setUint32(0, 0x06054b50, true);
-    edv.setUint16(8, files.length, true);
-    edv.setUint16(10, files.length, true);
-    edv.setUint32(12, cdSize, true);
-    edv.setUint32(16, cdOffset, true);
-
-    return new Blob([...parts, ...cdEntries, eocd], { type: 'application/zip' });
   }
 
   function cleanPathStr(p) {
@@ -1269,6 +1188,27 @@
 
         let outputDirHandle = window.__slicerOutputDirHandle || null;
         let outputDirPath = options.outputDir || (document.getElementById("slicerOutputDir") ? document.getElementById("slicerOutputDir").value.trim() : "");
+        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+        // In web browser (not localhost), we require a directory handle to save directly to disk with zero ZIPs
+        if (!isLocalHost && !outputDirHandle) {
+          if (typeof window.showDirectoryPicker === 'function') {
+            try {
+              outputDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+              if (outputDirHandle) {
+                window.__slicerOutputDirHandle = outputDirHandle;
+                const outInput = document.getElementById("slicerOutputDir");
+                if (outInput) {
+                  outInput.value = outputDirHandle.name;
+                  localStorage.setItem("slicerOutputDir", outputDirHandle.name);
+                }
+              }
+            } catch (pickErr) {
+              window.slicer.triggerFinished({ code: -1, error: 'আউটপুট ফোল্ডার নির্বাচন করা হয়নি।' });
+              return;
+            }
+          }
+        }
 
         if (!outputDirHandle && !outputDirPath) {
           window.slicer.triggerFinished({ code: -1, error: 'কোনো আউটপুট ফোল্ডার সিলেক্ট করা হয়নি।' });
@@ -1289,7 +1229,6 @@
         }
 
         const totalPdfs = files.length;
-        const allJobs = [];
         let totalAllCards = 0;
 
         if (outputDirHandle && typeof outputDirHandle.requestPermission === 'function') {
@@ -1356,41 +1295,7 @@
 
           if (cards && cards.length > 0) {
             totalAllCards += cards.length;
-            allJobs.push(...cards);
             window.slicer.triggerLog(`✅ [${fileIdx + 1}/${totalPdfs}] ${f.name} থেকে ${cards.length} টি কার্ড সম্পন্ন হয়েছে।\n`);
-          }
-        }
-
-        // If not using a native directory handle and running in browser (Firebase Hosting / Static Web), auto-package into ZIP!
-        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        if (!outputDirHandle && !isLocalHost && allJobs.length > 0) {
-          try {
-            window.slicer.triggerLog(`\n📦 মোট ${allJobs.length} টি ভোটার কার্ড জিপ ফাইলে প্যাকেজ করা হচ্ছে...\n`);
-            const zipFiles = allJobs.filter(c => c.dataUrl).map(c => {
-              const commaIdx = c.dataUrl.indexOf(',');
-              const bStr = atob(c.dataUrl.substring(commaIdx + 1));
-              const u8 = new Uint8Array(bStr.length);
-              for (let i = 0; i < bStr.length; i++) u8[i] = bStr.charCodeAt(i);
-              return {
-                name: c.subFolderName ? `${c.subFolderName}/${c.name}` : c.name,
-                data: u8
-              };
-            });
-            if (zipFiles.length > 0) {
-              const zipBlob = createZipBlob(zipFiles);
-              const zipUrl = URL.createObjectURL(zipBlob);
-              const a = document.createElement('a');
-              a.href = zipUrl;
-              const safeName = (outputDirPath || 'VoterCards').replace(/[^a-zA-Z0-9_\u0980-\u09FF-]/g, '_');
-              a.download = `${safeName}_${Date.now()}.zip`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              setTimeout(() => URL.revokeObjectURL(zipUrl), 60000);
-              window.slicer.triggerLog(`💾 জিপ ফাইল "${a.download}" স্বয়ংক্রিয়ভাবে ডাউনলোড সম্পন্ন হয়েছে!\n`);
-            }
-          } catch (zipErr) {
-            console.error("ZIP creation error:", zipErr);
           }
         }
 
@@ -1408,7 +1313,7 @@
         window.slicer.triggerFinished({
           code: 0,
           totalCards: totalAllCards,
-          outputDir: outputDirPath,
+          outputDir: outputDirHandle ? outputDirHandle.name : outputDirPath,
           outputDirName: outputDirHandle ? outputDirHandle.name : (outputDirPath ? outputDirPath.split(/[\\/]/).pop() : 'VoterCards')
         });
       },
