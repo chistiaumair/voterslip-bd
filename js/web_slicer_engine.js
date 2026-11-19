@@ -258,7 +258,13 @@
     );
 
     return {
-      dataUrl: sharedTrimCanvas.toDataURL('image/jpeg', 0.85),
+      canvas: sharedTrimCanvas,
+      get dataUrl() {
+        if (!this._dataUrl) {
+          this._dataUrl = sharedTrimCanvas.toDataURL('image/jpeg', 0.85);
+        }
+        return this._dataUrl;
+      },
       width: trimmedWidth,
       height: finalH
     };
@@ -575,6 +581,7 @@
       // Pre-extract page pixel data ONCE per page (zero GPU stalls during card trimming)
       const pageImageData = pageCtx.getImageData(0, 0, pageCanvas.width, pageCanvas.height);
       const pageBatchToSave = [];
+      const pageDiskWritePromises = [];
 
       // Detect card boxes on page (Page 3 has header at top with 5 rows; Page 4+ has 6 rows starting near top)
       const isFirstVoterPage = (pageNum === startPageNum);
@@ -613,7 +620,11 @@
           sharedTrimCanvas.height = cropH;
           sharedTrimCtx.drawImage(pageCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
           trimmed = {
-            dataUrl: sharedTrimCanvas.toDataURL('image/jpeg', 0.85),
+            canvas: sharedTrimCanvas,
+            get dataUrl() {
+              if (!this._dataUrl) this._dataUrl = sharedTrimCanvas.toDataURL('image/jpeg', 0.85);
+              return this._dataUrl;
+            },
             width: cropW,
             height: cropH
           };
@@ -627,18 +638,25 @@
           try {
             const blob = await new Promise(res => sharedTrimCanvas.toBlob(res, 'image/jpeg', 0.85));
             if (blob) {
-              const fileHandle = await subDirHandle.getFileHandle(cardFilename, { create: true });
-              const writable = await fileHandle.createWritable();
-              await writable.write(blob);
-              await writable.close();
+              pageDiskWritePromises.push((async (b, fname) => {
+                try {
+                  const fileHandle = await subDirHandle.getFileHandle(fname, { create: true });
+                  const writable = await fileHandle.createWritable();
+                  await writable.write(b);
+                  await writable.close();
+                } catch (writeErr) {
+                  console.error("Failed to write card to disk:", fname, writeErr);
+                }
+              })(blob, cardFilename));
             }
-          } catch (writeErr) {
-            console.error("Failed to write card to disk:", cardFilename, writeErr);
+          } catch (blobErr) {
+            console.error("Failed to create blob for card:", cardFilename, blobErr);
           }
         }
 
-        // Collect card for high-speed batch save via local server API
-        if (options.outputDir && typeof options.outputDir === 'string') {
+        // Collect card for high-speed batch save via local server API (only if running on localhost)
+        const isLocalHost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        if (isLocalHost && !subDirHandle && options.outputDir && typeof options.outputDir === 'string') {
           pageBatchToSave.push({
             fileName: cardFilename,
             base64: trimmed.dataUrl
@@ -657,6 +675,11 @@
 
         totalCardsExtracted++;
         pageExtracted++;
+      }
+
+      // Concurrently flush all card files for this page in parallel:
+      if (pageDiskWritePromises.length > 0) {
+        await Promise.all(pageDiskWritePromises);
       }
 
       // High-speed batch save: writes all cards of this page in a single fast server call

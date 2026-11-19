@@ -9019,7 +9019,7 @@
 
       // Select Input Folder
       if (selectSlicerInputDirBtn) {
-        selectSlicerInputDirBtn.addEventListener("click", () => {
+        selectSlicerInputDirBtn.addEventListener("click", async () => {
           if (window.slicer && window.slicer.selectDirectory && !window.slicer.isWebEngine) {
             // Electron Desktop App Mode: native IPC directory selection (100% untouched)
             window.slicer.selectDirectory("Select PDF Input Folder").then(dir => {
@@ -9029,13 +9029,44 @@
                 triggerAutoPreview();
               }
             });
-          } else {
-            // Web Browser Mode: Immediately and synchronously open folder selector
-            const fi = document.getElementById("slicerFolderInput");
-            if (fi) {
-              fi.value = "";
-              fi.click();
+            return;
+          }
+
+          // Modern Web Browser Mode (Chrome, Edge, Brave, Opera):
+          // Directly open native OS folder picker via showDirectoryPicker!
+          if ('showDirectoryPicker' in window) {
+            try {
+              const dirHandle = await window.showDirectoryPicker();
+              if (dirHandle) {
+                const pdfFiles = [];
+                for await (const entry of dirHandle.values()) {
+                  if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.pdf')) {
+                    const file = await entry.getFile();
+                    pdfFiles.push(file);
+                  }
+                }
+                if (pdfFiles.length === 0) {
+                  alert(`সিলেক্ট করা "${dirHandle.name}" ফোল্ডারে কোনো PDF ফাইল পাওয়া যায়নি!`);
+                  return;
+                }
+                pdfFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+                window.__webSelectedPdfs = pdfFiles;
+                slicerInputDirInput.value = `${dirHandle.name} (${pdfFiles.length} টি PDF)`;
+                localStorage.setItem("slicerInputDir", slicerInputDirInput.value);
+                triggerAutoPreview();
+                return;
+              }
+            } catch (err) {
+              if (err.name === 'AbortError') return; // User cancelled
+              console.warn("showDirectoryPicker for input failed, falling back to input element:", err);
             }
+          }
+
+          // Fallback to slicerFolderInput for older browsers
+          const fi = document.getElementById("slicerFolderInput");
+          if (fi) {
+            fi.value = "";
+            fi.click();
           }
         });
       }
@@ -9088,7 +9119,20 @@
           localStorage.setItem("slicerInputDir", val);
           if (val && !isElectron()) {
             const loaded = await loadPdfsFromPath(val, false);
-            if (!loaded) triggerAutoPreview();
+            if (loaded) {
+              triggerAutoPreview();
+            } else {
+              const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+              if (!isLocal) {
+                if (slicerPreviewPlaceholder) {
+                  slicerPreviewPlaceholder.style.display = "block";
+                  slicerPreviewPlaceholder.innerHTML = `<div style="cursor: pointer; padding: 12px; color: #38bdf8;">⚠️ ওয়েব ব্রাউজারের নিরাপত্তার কারণে টাইপ করা পাথ থেকে ফাইল পড়া যায় না।<br><br><span style="background: #2563eb; color: white; padding: 6px 14px; border-radius: 6px; font-weight: bold; display: inline-block; margin-top: 6px;">📂 এখানে ক্লিক করে "${val}" ফোল্ডারটি সিলেক্ট করুন</span></div>`;
+                  slicerPreviewPlaceholder.onclick = () => selectSlicerInputDirBtn && selectSlicerInputDirBtn.click();
+                }
+                if (slicerPreviewImg) slicerPreviewImg.style.display = "none";
+                if (slicerPreviewDimensionBadge) slicerPreviewDimensionBadge.style.display = "none";
+              }
+            }
           } else if (val) {
             triggerAutoPreview();
           }
@@ -9526,7 +9570,24 @@
             return;
           }
 
-          // If on localhost with web_server.js:
+          // Modern Web Browser Mode (Chrome, Edge, Brave, Opera):
+          // Open native OS folder picker directly!
+          if ('showDirectoryPicker' in window) {
+            try {
+              const dirHandle = await window.showDirectoryPicker();
+              if (dirHandle) {
+                window.__slicerOutputDirHandle = dirHandle;
+                slicerOutputDirInput.value = dirHandle.name;
+                localStorage.setItem("slicerOutputDir", dirHandle.name);
+                return;
+              }
+            } catch (err) {
+              if (err.name === 'AbortError') return; // User cancelled
+              console.warn("showDirectoryPicker failed:", err);
+            }
+          }
+
+          // Fallback if browser does not support showDirectoryPicker (e.g. Firefox)
           const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
           if (isLocal) {
             try {
@@ -9537,25 +9598,6 @@
               }
             } catch (e) {}
           }
-
-          // Modern Web Browser Mode (Chrome, Edge, Brave, Opera):
-          // Immediately open native OS folder picker dialog!
-          if ('showDirectoryPicker' in window) {
-            try {
-              const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-              if (dirHandle) {
-                window.__slicerOutputDirHandle = dirHandle;
-                slicerOutputDirInput.value = dirHandle.name;
-                localStorage.setItem("slicerOutputDir", dirHandle.name);
-                return;
-              }
-            } catch (err) {
-              if (err.name === 'AbortError') return; // User cancelled
-              console.warn("showDirectoryPicker failed, opening modal:", err);
-            }
-          }
-
-          // Web Browser Mode Fallback: Open Built-in Folder Selector Modal
           openFolderSelectorModal('output');
         });
       }
