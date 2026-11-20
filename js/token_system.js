@@ -31,51 +31,29 @@
     flatRate: 0.20,      // Flat per-token rate when pricingMode === 'flat'
     tokenRate: 0.10,     // Display/starting rate
     slabConfig: DEFAULT_SLAB_CONFIG,
-    bkashNumber: '+8801781923834',
-    nagadNumber: '+8801878753518',
+    bkashNumber: '01700000000',
+    nagadNumber: '01700000000',
     welcomeBonus: 0,
     supportPhone: '+8801556452488',
-    adminPhone: '01714298965',
-    adminPin: 'omairH5588'
+    adminPhone: '01700000000',
+    adminPin: '1234'
   };
 
   const DEFAULT_USERS = {
-    '01800000000': {
-      phone: '01800000000',
-      name: 'ডেমো ইউজার (Demo User)',
-      pin: '1234',
-      role: 'user',
-      tokens: 500,
-      usedTokens: 0,
-      createdAt: '2026-11-17T06:29:58.997Z'
-    },
-    '01714298965': {
-      phone: '01714298965',
+    '01700000000': {
+      phone: '01700000000',
       name: 'সুপার এডমিন (Admin)',
-      pin: 'omairH5588',
+      pin: '1234',
       role: 'admin',
       tokens: Infinity,
       usedTokens: 0,
-      createdAt: '2026-11-17T12:36:51.868Z'
+      createdAt: new Date().toISOString()
     }
   };
-
-  const DEFAULT_SAVED_ADMIN_ACCOUNTS = [
-    {
-      phone: '01714298965',
-      pin: 'omairH5588',
-      name: 'সুপার এডমিন (Admin)',
-      updatedAt: 1795006238514
-    }
-  ];
-
-  const EYE_OPEN_ICON = `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
-  const EYE_CLOSED_ICON = `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
 
   class TokenSystemManager {
     constructor() {
       this.initStorage();
-      this.syncLocalDataToServer();
       this.injectStyles();
       this.renderTopBar();
       this.renderModals();
@@ -191,56 +169,6 @@
 
     // ================= STORAGE INITIALIZATION =================
     initStorage() {
-      // 1. Version check and auto-migration for live deployment
-      const currentVer = parseInt(localStorage.getItem('voter_token_storage_version') || '0', 10);
-      if (currentVer < 3) {
-        let currentSettings = {};
-        try {
-          currentSettings = JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS) || '{}');
-        } catch (e) {}
-
-        currentSettings = {
-          ...DEFAULT_SETTINGS,
-          ...currentSettings,
-          supportPhone: DEFAULT_SETTINGS.supportPhone
-        };
-        if (!currentSettings.adminPhone || currentSettings.adminPhone === '01700000000') {
-          currentSettings.adminPhone = DEFAULT_SETTINGS.adminPhone;
-          currentSettings.adminPin = DEFAULT_SETTINGS.adminPin;
-        }
-        if (!currentSettings.bkashNumber || currentSettings.bkashNumber === '01700000000') {
-          currentSettings.bkashNumber = DEFAULT_SETTINGS.bkashNumber;
-        }
-        if (!currentSettings.nagadNumber || currentSettings.nagadNumber === '01700000000') {
-          currentSettings.nagadNumber = DEFAULT_SETTINGS.nagadNumber;
-        }
-        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(currentSettings));
-
-        let currentUsers = {};
-        try {
-          currentUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '{}');
-        } catch (e) {}
-
-        delete currentUsers['01700000000'];
-        currentUsers['01714298965'] = DEFAULT_USERS['01714298965'];
-        if (!currentUsers['01800000000']) {
-          currentUsers['01800000000'] = DEFAULT_USERS['01800000000'];
-        }
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(currentUsers));
-
-        let savedAdmins = [];
-        try {
-          savedAdmins = JSON.parse(localStorage.getItem(STORAGE_KEYS.SAVED_ADMIN_ACCOUNTS) || '[]');
-        } catch (e) {}
-        savedAdmins = savedAdmins.filter(a => a.phone !== '01700000000');
-        if (!savedAdmins.some(a => a.phone === '01714298965')) {
-          savedAdmins.unshift(DEFAULT_SAVED_ADMIN_ACCOUNTS[0]);
-        }
-        localStorage.setItem(STORAGE_KEYS.SAVED_ADMIN_ACCOUNTS, JSON.stringify(savedAdmins));
-
-        localStorage.setItem('voter_token_storage_version', '3');
-      }
-
       if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
         localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(DEFAULT_SETTINGS));
       }
@@ -255,9 +183,6 @@
       }
       if (!localStorage.getItem(STORAGE_KEYS.HISTORY)) {
         localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify([]));
-      }
-      if (!localStorage.getItem(STORAGE_KEYS.SAVED_ADMIN_ACCOUNTS)) {
-        localStorage.setItem(STORAGE_KEYS.SAVED_ADMIN_ACCOUNTS, JSON.stringify(DEFAULT_SAVED_ADMIN_ACCOUNTS));
       }
       // Migrate any legacy admin session out of CURRENT_USER into CURRENT_ADMIN (strict route isolation)
       const legacyPhone = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
@@ -416,7 +341,6 @@
       if (window.VoterHomePage && typeof window.VoterHomePage.syncWithSettings === 'function') {
         window.VoterHomePage.syncWithSettings();
       }
-      this.syncLocalDataToServer();
     }
 
     getUsers() {
@@ -462,87 +386,6 @@
       });
       if (history.length > 200) history.pop();
       localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(history));
-    }
-
-    // ================= DATA SYNC & BACKUP MANAGEMENT =================
-    syncLocalDataToServer() {
-      if (typeof window === 'undefined' || !window.location) return;
-      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') return;
-      try {
-        const s = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-        const u = localStorage.getItem(STORAGE_KEYS.USERS);
-        const a = localStorage.getItem(STORAGE_KEYS.CURRENT_ADMIN);
-        const sa = localStorage.getItem(STORAGE_KEYS.SAVED_ADMIN_ACCOUNTS);
-        const su = localStorage.getItem(STORAGE_KEYS.SAVED_USER_ACCOUNTS);
-        const r = localStorage.getItem(STORAGE_KEYS.REQUESTS);
-        const h = localStorage.getItem(STORAGE_KEYS.HISTORY);
-        if (!s && !u) return;
-        fetch('/api/sync-localhost-data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            settings: s ? JSON.parse(s) : null,
-            users: u ? JSON.parse(u) : null,
-            currentAdmin: a || null,
-            savedAdmins: sa ? JSON.parse(sa) : null,
-            savedUsers: su ? JSON.parse(su) : null,
-            requests: r ? JSON.parse(r) : [],
-            history: h ? JSON.parse(h) : [],
-            syncedAt: new Date().toISOString()
-          })
-        }).then(res => res.json()).then(data => {
-          console.log('[TokenSystem] Data synced to local server:', data);
-        }).catch(() => {});
-      } catch (e) {}
-    }
-
-    exportBackupJson() {
-      const data = {
-        version: 2,
-        settings: this.getSettings(),
-        users: this.getUsers(),
-        requests: this.getRequests(),
-        history: this.getHistory(),
-        savedAdmins: this.getSavedAccounts('admin'),
-        savedUsers: this.getSavedAccounts('user'),
-        exportedAt: new Date().toISOString()
-      };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `voterslip_backup_${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      this.showToast('ব্যাকআপ ফাইল সফলভাবে ডাউনলোড হয়েছে! 📥');
-    }
-
-    importBackupJson(event) {
-      const file = event?.target?.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const parsed = JSON.parse(e.target.result);
-          if (parsed.settings) this.saveSettings(parsed.settings);
-          if (parsed.users) this.saveUsers(parsed.users);
-          if (parsed.requests) localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(parsed.requests));
-          if (parsed.history) localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(parsed.history));
-          if (parsed.savedAdmins) localStorage.setItem(STORAGE_KEYS.SAVED_ADMIN_ACCOUNTS, JSON.stringify(parsed.savedAdmins));
-          if (parsed.savedUsers) localStorage.setItem(STORAGE_KEYS.SAVED_USER_ACCOUNTS, JSON.stringify(parsed.savedUsers));
-          this.renderAdminUsersTable();
-          this.renderAdminRequestsTable();
-          this.renderAdminHistoryTable();
-          this.renderSavedAccounts();
-          this.syncLocalDataToServer();
-          this.showToast('ব্যাকআপ সফলভাবে রিস্টোর হয়েছে! ✅');
-        } catch (err) {
-          alert('ব্যাকআপ ফাইলটি সঠিক নয়: ' + err.message);
-        }
-      };
-      reader.readAsText(file);
     }
 
     getCurrentUser() {
@@ -1054,39 +897,6 @@
           box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25) !important;
         }
 
-        /* Password Visibility Toggle */
-        .token-password-wrap {
-          position: relative !important;
-          width: 100% !important;
-          display: block !important;
-        }
-        .token-password-wrap input {
-          padding-right: 44px !important;
-        }
-        .token-password-toggle {
-          position: absolute !important;
-          right: 8px !important;
-          top: 50% !important;
-          transform: translateY(-50%) !important;
-          background: transparent !important;
-          border: none !important;
-          cursor: pointer !important;
-          padding: 6px !important;
-          color: #94a3b8 !important;
-          display: inline-flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          border-radius: 6px !important;
-          transition: all 0.2s ease !important;
-          user-select: none !important;
-          z-index: 5 !important;
-          line-height: 1 !important;
-        }
-        .token-password-toggle:hover {
-          color: #38bdf8 !important;
-          background: rgba(56, 189, 248, 0.15) !important;
-        }
-
         /* Send Money Card */
         .token-payment-card {
           background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.85));
@@ -1311,108 +1121,6 @@
           transform: translateY(0);
           opacity: 1;
         }
-
-        /* Mobile Responsive Adjustments for Token System */
-        @media (max-width: 680px) {
-          .token-header-bar {
-            padding: 8px 12px;
-            gap: 10px;
-          }
-          .token-brand-area {
-            width: 100%;
-            justify-content: space-between;
-          }
-          .token-user-area {
-            width: 100%;
-            justify-content: space-between;
-            gap: 6px;
-          }
-          .token-role-badge {
-            padding: 4px 8px;
-            gap: 6px;
-          }
-          .token-role-badge .role-icon {
-            font-size: 16px;
-          }
-          .token-role-badge .role-text .role-title {
-            font-size: 11.5px;
-          }
-          .token-balance-pill {
-            padding: 4px 10px;
-            font-size: 11.5px;
-          }
-          .token-btn {
-            padding: 6px 10px;
-            font-size: 12px;
-          }
-          .token-modal-card {
-            padding: 16px 14px !important;
-            max-height: 94vh !important;
-            border-radius: 14px !important;
-          }
-          .token-modal-header {
-            padding-bottom: 10px;
-            margin-bottom: 12px;
-          }
-          .token-modal-title {
-            font-size: 16px;
-          }
-          .token-tabs {
-            overflow-x: auto;
-            white-space: nowrap;
-            -webkit-overflow-scrolling: touch;
-            padding-bottom: 4px;
-            margin-bottom: 14px;
-            gap: 4px;
-          }
-          .token-tab-btn {
-            padding: 8px 12px;
-            font-size: 12.5px;
-            flex-shrink: 0;
-          }
-          .token-form-group {
-            margin-bottom: 12px !important;
-          }
-          .token-form-label {
-            font-size: 12.5px !important;
-          }
-          .token-modal-card input[type="text"],
-          .token-modal-card input[type="password"],
-          .token-modal-card input[type="number"],
-          .token-form-input {
-            height: 42px !important;
-            min-height: 42px !important;
-            font-size: 14px !important;
-            padding: 8px 12px !important;
-          }
-          .token-number-box {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 8px;
-            text-align: center;
-          }
-          .token-copy-btn {
-            width: 100%;
-          }
-          .token-preset-chips {
-            gap: 6px;
-          }
-          .token-chip {
-            padding: 5px 9px;
-            font-size: 11px;
-          }
-          .token-table-wrap {
-            -webkit-overflow-scrolling: touch;
-          }
-          .token-toast {
-            bottom: 12px;
-            right: 12px;
-            left: 12px;
-            padding: 10px 14px;
-            font-size: 13px;
-            max-width: calc(100% - 24px);
-          }
-        }
       `;
       document.head.appendChild(style);
     }
@@ -1482,12 +1190,7 @@
               </div>
               <div class="token-form-group">
                 <label class="token-form-label">পিন / পাসওয়ার্ড (৪ ডিজিট):</label>
-                <div class="token-password-wrap">
-                  <input type="password" id="userLoginPinInput" class="token-form-input" placeholder="আপনার পিন লিখুন" style="width:100%!important; height:46px!important; font-size:15px!important;" />
-                  <button type="button" class="token-password-toggle" onclick="TokenSystem.togglePasswordVisibility('userLoginPinInput', this)" title="পাসওয়ার্ড দেখুন" aria-label="পাসওয়ার্ড দেখুন">
-                    ${EYE_OPEN_ICON}
-                  </button>
-                </div>
+                <input type="password" id="userLoginPinInput" class="token-form-input" placeholder="আপনার পিন লিখুন" style="width:100%!important; height:46px!important; font-size:15px!important;" />
               </div>
 
               <div class="token-forgot-row">
@@ -1517,12 +1220,7 @@
               </div>
               <div class="token-form-group">
                 <label class="token-form-label">পিন / পাসওয়ার্ড (৪ ডিজিট):</label>
-                <div class="token-password-wrap">
-                  <input type="password" id="userRegPinInput" class="token-form-input" placeholder="যেমন: 1234" style="width:100%!important; height:46px!important; font-size:15px!important;" />
-                  <button type="button" class="token-password-toggle" onclick="TokenSystem.togglePasswordVisibility('userRegPinInput', this)" title="পাসওয়ার্ড দেখুন" aria-label="পাসওয়ার্ড দেখুন">
-                    ${EYE_OPEN_ICON}
-                  </button>
-                </div>
+                <input type="password" id="userRegPinInput" class="token-form-input" placeholder="যেমন: 1234" style="width:100%!important; height:46px!important; font-size:15px!important;" />
               </div>
               <button class="token-btn token-btn-primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 10px; font-size: 15px;" onclick="TokenSystem.handleUserRegister()">
                 একাউন্ট তৈরি করুন
@@ -1542,22 +1240,12 @@
 
               <div class="token-form-group">
                 <label class="token-form-label">নতুন পিন / পাসওয়ার্ড (কমপক্ষে ৪ ডিজিট):</label>
-                <div class="token-password-wrap">
-                  <input type="password" id="forgotNewPinInput" class="token-form-input" placeholder="নতুন পিন দিন" style="width:100%!important; height:46px!important; font-size:15px!important;" />
-                  <button type="button" class="token-password-toggle" onclick="TokenSystem.togglePasswordVisibility('forgotNewPinInput', this)" title="পাসওয়ার্ড দেখুন" aria-label="পাসওয়ার্ড দেখুন">
-                    ${EYE_OPEN_ICON}
-                  </button>
-                </div>
+                <input type="password" id="forgotNewPinInput" class="token-form-input" placeholder="নতুন পিন দিন" style="width:100%!important; height:46px!important; font-size:15px!important;" />
               </div>
 
               <div class="token-form-group">
                 <label class="token-form-label">নতুন পিন পুনরায় লিখুন:</label>
-                <div class="token-password-wrap">
-                  <input type="password" id="forgotConfirmPinInput" class="token-form-input" placeholder="একই পিন আবার দিন" style="width:100%!important; height:46px!important; font-size:15px!important;" />
-                  <button type="button" class="token-password-toggle" onclick="TokenSystem.togglePasswordVisibility('forgotConfirmPinInput', this)" title="পাসওয়ার্ড দেখুন" aria-label="পাসওয়ার্ড দেখুন">
-                    ${EYE_OPEN_ICON}
-                  </button>
-                </div>
+                <input type="password" id="forgotConfirmPinInput" class="token-form-input" placeholder="একই পিন আবার দিন" style="width:100%!important; height:46px!important; font-size:15px!important;" />
               </div>
 
               <button class="token-btn token-btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 15px;" onclick="TokenSystem.completeAutoPasswordReset()">
@@ -1590,12 +1278,7 @@
 
             <div class="token-form-group">
               <label class="token-form-label">এডমিন পিন / পাসওয়ার্ড:</label>
-              <div class="token-password-wrap">
-                <input type="password" id="adminLoginPinInput" class="token-form-input" placeholder="এডমিন পিন দিন" style="width:100%!important; height:46px!important; font-size:15px!important;" />
-                <button type="button" class="token-password-toggle" onclick="TokenSystem.togglePasswordVisibility('adminLoginPinInput', this)" title="পাসওয়ার্ড দেখুন" aria-label="পাসওয়ার্ড দেখুন">
-                  ${EYE_OPEN_ICON}
-                </button>
-              </div>
+              <input type="password" id="adminLoginPinInput" class="token-form-input" placeholder="এডমিন পিন দিন" style="width:100%!important; height:46px!important; font-size:15px!important;" />
             </div>
 
             <button class="token-btn token-btn-admin" style="width: 100%; justify-content: center; padding: 12px; margin-top: 8px; font-size: 15px;" onclick="TokenSystem.handleAdminLogin()">
@@ -1864,11 +1547,6 @@
                   <label class="token-form-label">🔑 এডমিন পিন কোড:</label>
                   <input type="text" id="setAdminPinInput" class="token-form-input" style="height:44px!important;" />
                 </div>
-
-                <div class="token-form-group" style="grid-column: 1 / -1;">
-                  <label class="token-form-label">📞 সাপোর্ট ও হোয়াটসঅ্যাপ নম্বর (হোমপেজ ও ইউজারের জন্য):</label>
-                  <input type="text" id="setSupportPhoneInput" class="token-form-input" placeholder="+8801556452488" style="height:44px!important;" />
-                </div>
               </div>
 
               <!-- Pricing Mode Selector & Settings -->
@@ -1932,16 +1610,7 @@
                   </div>
                 </div>
 
-                <div style="margin-top: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <button type="button" class="token-btn token-btn-outline" style="padding: 10px 16px; font-size: 13px;" onclick="TokenSystem.exportBackupJson()" title="সমস্ত ইউজার ও সেটিংস ব্যাকআপ ফাইল হিসেবে ডাউনলোড করুন">
-                      📥 ব্যাকআপ ডাউনলোড (JSON)
-                    </button>
-                    <label class="token-btn token-btn-outline" style="padding: 10px 16px; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; margin: 0;" title="পূর্বে ডাউনলোড করা ব্যাকআপ ফাইল রিস্টোর করুন">
-                      📤 ব্যাকআপ রিস্টোর
-                      <input type="file" accept=".json" style="display:none;" onchange="TokenSystem.importBackupJson(event)" />
-                    </label>
-                  </div>
+                <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
                   <button class="token-btn token-btn-primary" style="padding: 11px 28px; font-size: 14.5px;" onclick="TokenSystem.saveAdminSettings()">
                     💾 সেটিংস সংরক্ষণ করুন
                   </button>
@@ -2218,18 +1887,6 @@
         regForm.style.display = 'block';
         tabLoginBtn.classList.remove('active');
         tabRegBtn.classList.add('active');
-      }
-    }
-
-    togglePasswordVisibility(inputId, btnEl) {
-      const input = document.getElementById(inputId);
-      if (!input) return;
-      const isPass = input.type === 'password';
-      input.type = isPass ? 'text' : 'password';
-      if (btnEl) {
-        btnEl.innerHTML = isPass ? EYE_CLOSED_ICON : EYE_OPEN_ICON;
-        btnEl.title = isPass ? 'পাসওয়ার্ড লুকান' : 'পাসওয়ার্ড দেখুন';
-        btnEl.setAttribute('aria-label', isPass ? 'পাসওয়ার্ড লুকান' : 'পাসওয়ার্ড দেখুন');
       }
     }
 
@@ -3239,8 +2896,6 @@
       document.getElementById('setNagadInput').value = s.nagadNumber;
       document.getElementById('setAdminPhoneInput').value = s.adminPhone;
       document.getElementById('setAdminPinInput').value = s.adminPin;
-      const elSupport = document.getElementById('setSupportPhoneInput');
-      if (elSupport) elSupport.value = s.supportPhone || '+8801556452488';
 
       const el10 = document.getElementById('setSlabPrice10k');
       const el20 = document.getElementById('setSlabPrice20k');
@@ -3307,7 +2962,7 @@
         welcomeBonus: 0,
         adminPhone: newAdminPhone,
         adminPin: newAdminPin,
-        supportPhone: (document.getElementById('setSupportPhoneInput')?.value || '').trim() || '+8801556452488'
+        supportPhone: oldSettings.supportPhone || '+8801556452488'
       };
 
       // Update the existing Super Admin entry in-place (prevent creating a duplicate user!)

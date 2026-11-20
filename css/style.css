@@ -470,34 +470,3 @@ select {
   color: #2dd4bf;
   box-shadow: 0 0 8px rgba(45, 212, 191, 0.2);
 }
-
-/* Mobile Responsive Overrides for App Container */
-@media (max-width: 768px) {
-  body {
-    height: auto !important;
-    min-height: 100vh !important;
-    display: block !important;
-    overflow-x: hidden !important;
-  }
-  .container {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-height: 100vh !important;
-    max-height: none !important;
-    border-radius: 0 !important;
-    border: none !important;
-    padding: 10px 8px !important;
-    box-shadow: none !important;
-  }
-  .app-layout {
-    gap: 1rem !important;
-  }
-  .img_bg,
-  .title_img {
-    padding: 8px 6px !important;
-    gap: 6px !important;
-  }
-  .gradient-slider-group {
-    grid-template-columns: 1fr !important;
-  }
-}

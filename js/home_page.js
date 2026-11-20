@@ -969,170 +969,19 @@
 
         /* Responsive */
         @media (max-width: 960px) {
-          .vh-hero { grid-template-columns: 1fr; padding-top: 24px; gap: 24px; }
-          .vh-hero-title { font-size: 32px; }
+          .vh-hero { grid-template-columns: 1fr; padding-top: 30px; }
+          .vh-hero-title { font-size: 34px; }
           .vh-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .vh-pricing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .vh-grid-3 { grid-template-columns: 1fr; }
         }
-        @media (max-width: 680px) {
-          .vh-shell { padding: 0 14px; }
-          .vh-section { padding: 32px 0; }
-          .vh-section-title { font-size: 24px !important; }
-          .vh-section-sub { font-size: 13.5px !important; }
-          
-          /* Mobile Sticky Navbar */
-          .vh-nav {
-            padding: 8px 12px;
-            gap: 8px;
-          }
-          .vh-logo-icon {
-            width: 32px;
-            height: 32px;
-            font-size: 17px;
-          }
-          .vh-logo-name {
-            font-size: 14.5px;
-          }
-          .vh-logo-sub {
-            display: none;
-          }
-          .vh-nav-right {
-            width: 100%;
-            justify-content: space-between;
-            gap: 4px;
-          }
-          .vh-nav-link {
-            font-size: 11.5px;
-            padding: 5px 6px;
-          }
-          .vh-wa-pill {
-            display: none;
-          }
-          .vh-nav-right .vh-btn {
-            padding: 6px 10px;
-            font-size: 12px;
-            border-radius: 8px;
-          }
-
-          /* Mobile Hero */
-          .vh-hero {
-            padding: 14px 0 20px;
-            gap: 18px;
-          }
-          .vh-hero-title {
-            font-size: clamp(22px, 6.2vw, 28px);
-            line-height: 1.25;
-            margin-bottom: 10px;
-          }
-          .vh-hero-desc {
-            font-size: 13.5px;
-            line-height: 1.55;
-            margin-bottom: 14px;
-          }
-          .vh-hero-cta {
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-            gap: 8px;
-          }
-          .vh-hero-cta .vh-btn {
-            width: 100%;
-            justify-content: center;
-            padding: 10px 16px;
-            font-size: 13.5px;
-          }
-          .vh-stats-row {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 6px;
-          }
-          .vh-stat-pill {
-            padding: 7px 5px;
-            text-align: center;
-          }
-          .vh-stat-val {
-            font-size: 12px;
-          }
-          .vh-stat-lbl {
-            font-size: 9.5px;
-          }
-
-          /* Mobile Pricing Spotlight Card */
-          .vh-price-spotlight {
-            padding: 16px 14px;
-            border-radius: 14px;
-          }
-          .vh-spot-rate-box {
-            padding: 10px 12px;
-          }
-          .vh-spot-price {
-            font-size: clamp(26px, 8vw, 36px);
-            line-height: 1.1;
-          }
-          .vh-spot-currency-unit {
-            font-size: clamp(15px, 4.2vw, 19px);
-          }
-          .vh-mini-calc {
-            padding: 10px 12px;
-          }
-          .vh-calc-total {
-            font-size: clamp(15px, 4.6vw, 20px);
-          }
-          .vh-spot-checks {
-            padding-left: 0;
-            font-size: 11.5px;
-            line-height: 1.45;
-          }
-
-          /* Mobile Cards */
-          .vh-grid-4 { grid-template-columns: 1fr; gap: 14px; }
-          .vh-pricing-grid { grid-template-columns: 1fr; gap: 14px; }
-          .vh-flat-examples { grid-template-columns: 1fr; gap: 8px; }
-          .vh-feature-card { padding: 18px 14px; }
-          .vh-step-card { padding: 18px 14px; }
-          .vh-contact-banner { padding: 24px 16px; border-radius: 16px; }
-
-          /* Mobile Sample Preview Modal */
-          .vh-sample-modal {
-            padding: 8px;
-          }
-          .vh-sample-dialog {
-            width: 98vw;
-            max-height: 96vh;
-            border-radius: 12px;
-          }
-          .vh-sample-modal-head {
-            padding: 10px 12px;
-            gap: 8px;
-          }
-          .vh-sample-switcher {
-            width: 100%;
-            justify-content: space-between;
-            gap: 4px;
-            padding: 3px;
-          }
-          .vh-sw-btn {
-            padding: 5px 6px;
-            font-size: 11px;
-            flex: 1;
-            text-align: center;
-          }
-          .vh-sample-head-right {
-            width: 100%;
-            justify-content: space-between;
-          }
-          .vh-sample-head-right .vh-btn {
-            padding: 6px 12px;
-            font-size: 12px;
-            flex: 1;
-          }
-          .vh-sample-img-frame {
-            padding: 8px 6px;
-          }
-          .vh-real-a4-sheet {
-            padding: 6px;
-            gap: 6px;
-          }
+        @media (max-width: 600px) {
+          .vh-grid-4 { grid-template-columns: 1fr; }
+          .vh-pricing-grid { grid-template-columns: 1fr; }
+          .vh-flat-examples { grid-template-columns: 1fr; }
+          .vh-stats-row { grid-template-columns: 1fr; }
+          .vh-hero-title { font-size: 28px; }
+          .vh-spot-price { font-size: 42px; }
         }
       `;
       document.head.appendChild(style);
@@ -1577,8 +1426,7 @@
         heroRate.innerHTML = `<span>৳ ${this.formatMoney(displayRate)}</span><span class="vh-spot-currency-unit">${rateUnit}</span>`;
       }
 
-      const settings = this.getSettings();
-      const waDisplay = (settings && settings.supportPhone) ? settings.supportPhone : DEFAULT_WHATSAPP_NUMBER;
+      const waDisplay = DEFAULT_WHATSAPP_NUMBER;
       const cleanDigits = waDisplay.replace(/[^0-9]/g, '');
       const waNum = cleanDigits.startsWith('88') ? cleanDigits : '88' + cleanDigits;
       const waHref = `https://wa.me/${waNum}?text=${encodeURIComponent('আসসালামু আলাইকুম, ভোটার স্লিপ জেনারেটর সম্পর্কে জানতে চাচ্ছি।')}`;

@@ -138,19 +138,6 @@ const server = http.createServer(async (req, res) => {
   const urlObj = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = decodeURIComponent(urlObj.pathname);
 
-  // API: Sync Local Storage Data to Disk
-  if (pathname === '/api/sync-localhost-data' && req.method === 'POST') {
-    try {
-      const data = await parseJsonBody(req);
-      fs.writeFileSync(path.join(ROOT_DIR, 'admin_synced_data.json'), JSON.stringify(data, null, 2), 'utf8');
-      console.log('>>> Admin data successfully synced from browser to admin_synced_data.json');
-      sendJson(res, 200, { success: true, message: 'Data saved successfully' });
-    } catch (err) {
-      sendJson(res, 500, { success: false, error: err.message });
-    }
-    return;
-  }
-
   // 1. API: Quick Standard System Folders
   if (pathname === '/api/quick-folders' && req.method === 'GET') {
     const userProfile = process.env.USERPROFILE || 'C:\\Users\\Default';
